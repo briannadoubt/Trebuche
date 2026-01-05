@@ -2,7 +2,7 @@
 
 Location-transparent distributed actors for Swift. Make RPC stupid simple.
 
-[![Documentation](https://img.shields.io/badge/docs-DocC-blue)](https://bri.github.io/Trebuche/documentation/trebuche/)
+[![Documentation](https://img.shields.io/badge/docs-DocC-blue)](https://briannadoubt.github.io/Trebuche/documentation/trebuche/)
 
 ## Overview
 
@@ -21,7 +21,7 @@ Add Trebuche to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/bri/Trebuche.git", from: "1.0.0")
+    .package(url: "https://github.com/briannadoubt/Trebuche.git", from: "1.0.0")
 ]
 ```
 
@@ -61,7 +61,7 @@ try await room.join(player: me)  // Looks local, works remotely!
 
 ## Documentation
 
-Full documentation is available at **[bri.github.io/Trebuche](https://bri.github.io/Trebuche/documentation/trebuche/)**.
+Full documentation is available at **[briannadoubt.github.io/Trebuche](https://briannadoubt.github.io/Trebuche/documentation/trebuche/)**.
 
 ## Requirements
 
