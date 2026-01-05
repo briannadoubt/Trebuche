@@ -170,6 +170,7 @@ do {
 
 ## Next Steps
 
+- See <doc:SwiftUIIntegration> for building SwiftUI apps with observable connections
 - Explore ``TrebuchetServer`` for advanced server configuration
 - Learn about ``TrebuchetTransport`` for custom transport implementations
 - Check out ``TrebuchetActorID`` to understand actor identification

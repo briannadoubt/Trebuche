@@ -35,8 +35,15 @@ Sources/Trebuche/
 │       └── WebSocketTransport.swift # WebSocket implementation using swift-nio
 ├── Server/
 │   └── TrebuchetServer.swift       # Server API for hosting actors
-└── Client/
-    └── TrebuchetClient.swift       # Client API for resolving remote actors
+├── Client/
+│   └── TrebuchetClient.swift       # Client API for resolving remote actors
+└── SwiftUI/
+    ├── ConnectionState.swift       # Connection state enum, ReconnectionPolicy
+    ├── TrebuchetConnection.swift   # @Observable connection wrapper
+    ├── TrebuchetConnectionManager.swift # Multi-server manager
+    ├── TrebuchetEnvironment.swift  # SwiftUI environment integration
+    ├── TrebuchetViewModifiers.swift # View modifiers
+    └── RemoteActorWrapper.swift    # @RemoteActor property wrapper
 
 Sources/TrebucheMacros/
 └── TrebucheMacros.swift            # @Trebuchet macro implementation
@@ -49,6 +56,14 @@ Sources/TrebucheMacros/
 - **TrebuchetServer/TrebuchetClient**: High-level API for exposing and resolving actors
 - **TrebuchetTransport**: Protocol for pluggable network transports
 - **@Trebuchet macro**: Adds `typealias ActorSystem = TrebuchetActorSystem` to distributed actors
+
+#### SwiftUI Types
+
+- **TrebuchetConnection**: Observable connection wrapper with auto-reconnection
+- **TrebuchetConnectionManager**: Multi-server connection orchestrator
+- **TrebuchetEnvironment**: SwiftUI environment container view
+- **@RemoteActor**: Property wrapper for automatic actor resolution
+- **ConnectionState**: Connection lifecycle state enum
 
 ### Usage Pattern
 
@@ -70,6 +85,35 @@ let client = TrebuchetClient(transport: .webSocket(host: "localhost", port: 8080
 try await client.connect()
 let room = try client.resolve(GameRoom.self, id: "main-room")
 try await room.join(player: me)
+```
+
+### SwiftUI Usage Pattern
+
+```swift
+// App setup with .trebuche() modifier
+@main
+struct GameApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .trebuche(transport: .webSocket(host: "game.example.com", port: 8080))
+        }
+    }
+}
+
+// Using @RemoteActor in views
+struct LobbyView: View {
+    @RemoteActor(id: "lobby") var lobby: GameLobby?
+
+    var body: some View {
+        switch $lobby.state {
+        case .loading: ProgressView()
+        case .resolved(let lobby): LobbyContent(lobby: lobby)
+        case .failed(let error): ErrorView(error: error)
+        case .disconnected: Text("Offline")
+        }
+    }
+}
 ```
 
 ### Dependencies
