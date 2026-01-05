@@ -68,3 +68,16 @@ try await room.join(player: me)  // Looks local, works remotely!
 - ``TrebuchetEncoder``
 - ``TrebuchetDecoder``
 - ``TrebuchetResultHandler``
+
+### SwiftUI Integration
+
+- <doc:SwiftUIIntegration>
+- ``TrebuchetConnection``
+- ``TrebuchetConnectionManager``
+- ``TrebuchetEnvironment``
+- ``ConnectionState``
+- ``ConnectionError``
+- ``ReconnectionPolicy``
+- ``ConnectionEvent``
+- ``RemoteActor``
+- ``RemoteActorView``
