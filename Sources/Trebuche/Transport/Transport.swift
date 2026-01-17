@@ -22,6 +22,12 @@ public struct Endpoint: Sendable, Hashable {
 /// distributed actor systems. Different implementations can use
 /// WebSocket, HTTP, TCP, or custom protocols.
 public protocol TrebuchetTransport: Sendable {
+    /// Establish a connection to an endpoint (for clients).
+    ///
+    /// This method should perform the actual network handshake and throw
+    /// if the connection cannot be established.
+    func connect(to endpoint: Endpoint) async throws
+
     /// Send data to a specific endpoint
     func send(_ data: Data, to endpoint: Endpoint) async throws
 

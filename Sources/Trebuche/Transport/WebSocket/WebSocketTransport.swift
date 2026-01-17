@@ -49,6 +49,22 @@ public final class WebSocketTransport: TrebuchetTransport, @unchecked Sendable {
         }
     }
 
+    public func connect(to endpoint: Endpoint) async throws {
+        let continuation = incomingContinuation
+        do {
+            _ = try await connectionManager.getOrCreate(
+                to: endpoint,
+                using: eventLoopGroup,
+                onMessage: { data in
+                    let message = TransportMessage(data: data, source: endpoint, respond: { _ in })
+                    continuation.yield(message)
+                }
+            )
+        } catch {
+            throw TrebuchetError.connectionFailed(host: endpoint.host, port: endpoint.port, underlying: error)
+        }
+    }
+
     public func send(_ data: Data, to endpoint: Endpoint) async throws {
         let continuation = incomingContinuation
         let ws = try await connectionManager.getOrCreate(
