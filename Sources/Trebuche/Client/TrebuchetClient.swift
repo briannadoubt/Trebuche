@@ -56,7 +56,12 @@ public final class TrebuchetClient: Sendable {
     ///
     /// This establishes the underlying transport connection and starts
     /// processing incoming responses.
+    ///
+    /// - Throws: ``TrebuchetError/connectionFailed`` if the connection cannot be established.
     public func connect() async throws {
+        // Actually establish the connection - this will throw if the server is unreachable
+        try await transport.connect(to: serverEndpoint)
+
         // Start processing incoming responses in the background
         Task {
             for await message in transport.incoming {
