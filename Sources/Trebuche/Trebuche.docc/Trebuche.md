@@ -31,6 +31,7 @@ try await room.join(player: me)
 
 - <doc:GettingStarted>
 - <doc:DefiningActors>
+- <doc:SwiftUIIntegration>
 
 ### Actor System
 
@@ -63,3 +64,16 @@ try await room.join(player: me)
 - ``TrebuchetConnection``
 - ``TrebuchetConnectionManager``
 - ``ConnectionState``
+
+### Cloud Deployment
+
+- <doc:CloudDeploymentOverview>
+- <doc:DeployingToAWS>
+- <doc:AWSConfiguration>
+- <doc:DeployingToGCP>
+- <doc:DeployingToAzure>
+
+### Module Reference
+
+- <doc:TrebucheCloud>
+- <doc:TrebucheAWS>

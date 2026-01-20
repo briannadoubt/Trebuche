@@ -9,27 +9,27 @@ TrebucheCloud provides the abstractions needed to deploy Swift distributed actor
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Cloud Environment                           │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              CloudGateway                                │   │
-│  │  ┌─────────────┐    ┌─────────────┐    ┌────────────┐  │   │
-│  │  │ UserService │    │  GameRoom   │    │   Lobby    │  │   │
-│  │  └─────────────┘    └─────────────┘    └────────────┘  │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              ↓                                  │
+┌───────────────────────────────────────────────────────────────┐
+│                      Cloud Environment                        │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │              CloudGateway                               │  │
+│  │  ┌─────────────┐    ┌─────────────┐    ┌────────────┐   │  │
+│  │  │ UserService │    │  GameRoom   │    │   Lobby    │   │  │
+│  │  └─────────────┘    └─────────────┘    └────────────┘   │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                              ↓                                │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐    │
 │  │  StateStore  │  │   Registry   │  │   HTTP Endpoint   │    │
 │  │ (DynamoDB)   │  │  (CloudMap)  │  │  (API Gateway)    │    │
 │  └──────────────┘  └──────────────┘  └───────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ## Key Components
 
 ### CloudGateway
 
-The ``CloudGateway`` is the entry point for hosting actors in cloud environments. It handles:
+The `CloudGateway` is the entry point for hosting actors in cloud environments. It handles:
 - Actor registration and exposure
 - Incoming invocation routing
 - State persistence coordination
@@ -49,7 +49,7 @@ try await gateway.run()
 
 ### CloudProvider
 
-The ``CloudProvider`` protocol abstracts cloud platform specifics:
+The `CloudProvider` protocol abstracts cloud platform specifics:
 
 ```swift
 public protocol CloudProvider: Sendable {
@@ -69,7 +69,7 @@ public protocol CloudProvider: Sendable {
 
 ### ServiceRegistry
 
-The ``ServiceRegistry`` protocol enables actor discovery:
+The `ServiceRegistry` protocol enables actor discovery:
 
 ```swift
 public protocol ServiceRegistry: Sendable {
@@ -81,7 +81,7 @@ public protocol ServiceRegistry: Sendable {
 
 ### ActorStateStore
 
-The ``ActorStateStore`` protocol provides state persistence:
+The `ActorStateStore` protocol provides state persistence:
 
 ```swift
 public protocol ActorStateStore: Sendable {
@@ -99,7 +99,7 @@ For local development, use the in-memory implementations:
 let gateway = CloudGateway.development(host: "localhost", port: 8080)
 ```
 
-This creates a gateway with ``InMemoryStateStore`` and ``InMemoryRegistry``.
+This creates a gateway with `InMemoryStateStore` and `InMemoryRegistry`.
 
 ## See Also
 
