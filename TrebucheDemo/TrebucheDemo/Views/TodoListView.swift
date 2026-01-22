@@ -76,6 +76,12 @@ struct TodoListView: View {
             .refreshable {
                 await loadTodos()
             }
+            .task(id: todoList?.id) {
+                // Load todos when actor becomes available
+                if todoList != nil {
+                    await loadTodos()
+                }
+            }
         }
     }
 
