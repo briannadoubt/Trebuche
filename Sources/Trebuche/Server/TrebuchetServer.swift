@@ -26,6 +26,9 @@ public final class TrebuchetServer: Sendable {
     /// Registry of streaming handlers by type
     private let streamingHandlers = StreamingHandlerRegistry()
 
+    /// Buffer for outgoing stream data (for resumption support)
+    private let streamBuffer = ServerStreamBuffer()
+
     /// Create a new server with the specified transport
     /// - Parameter transport: The transport configuration (e.g., `.webSocket(port: 8080)`)
     public init(transport: TransportConfiguration) {
@@ -215,6 +218,9 @@ public final class TrebuchetServer: Sendable {
         // Clean up all active streams
         await actorSystem.streamRegistry.removeAllStreams()
 
+        // Clean up all stream buffers
+        await streamBuffer.removeAllBuffers()
+
         // Shutdown transport
         await transport.shutdown()
     }
@@ -300,11 +306,15 @@ public final class TrebuchetServer: Sendable {
             let stream = try await actorSystem.executeStreamingTarget(envelope)
 
             // Run stream iteration in background task to avoid blocking the message handler
+            let buffer = streamBuffer
             Task {
                 do {
                     var sequenceNumber: UInt64 = 0
                     for try await data in stream {
                         sequenceNumber += 1
+
+                        // Buffer the data for potential resumption
+                        await buffer.buffer(streamID: streamID, sequence: sequenceNumber, data: data)
 
                         let dataEnvelope = StreamDataEnvelope(
                             streamID: streamID,
@@ -323,6 +333,9 @@ public final class TrebuchetServer: Sendable {
                     )
                     let endData = try encoder.encode(endEnvelope)
                     try await respond(endData)
+
+                    // Clean up buffer
+                    await buffer.removeBuffer(streamID: streamID)
                 } catch {
                     // Send error envelope
                     let errorEnvelope = TrebuchetEnvelope.streamError(
@@ -356,9 +369,9 @@ public final class TrebuchetServer: Sendable {
         encoder.dateEncodingStrategy = .iso8601
 
         // Check if we have buffered data for this stream
-        if let bufferedData = await actorSystem.streamRegistry.resumeStream(
+        if let bufferedData = await streamBuffer.getBufferedData(
             streamID: envelope.streamID,
-            lastSequence: envelope.lastSequence
+            afterSequence: envelope.lastSequence
         ), !bufferedData.isEmpty {
             // Replay buffered data
             do {
@@ -417,7 +430,7 @@ private actor StreamingHandlerRegistry {
     /// Register a general streaming handler
     func register(handler: @escaping @Sendable (InvocationEnvelope, any DistributedActor) async throws -> AsyncStream<Data>) {
         handlers.append { envelope, actor in
-            try? await handler(envelope, actor)
+            try await handler(envelope, actor)
         }
     }
 
@@ -428,7 +441,7 @@ private actor StreamingHandlerRegistry {
             guard let typedActor = actor as? T else {
                 return nil
             }
-            return try? await handler(envelope, typedActor)
+            return try await handler(envelope, typedActor)
         }
     }
 
@@ -436,8 +449,14 @@ private actor StreamingHandlerRegistry {
     func handle(envelope: InvocationEnvelope, actor: any DistributedActor) async throws -> AsyncStream<Data> {
         // Try each handler in order until one succeeds
         for handler in handlers {
-            if let stream = try await handler(envelope, actor) {
-                return stream
+            do {
+                if let stream = try await handler(envelope, actor) {
+                    return stream
+                }
+                // nil means type mismatch, continue to next handler
+            } catch {
+                // Handler matched but threw an error - propagate it immediately
+                throw error
             }
         }
 
@@ -445,5 +464,64 @@ private actor StreamingHandlerRegistry {
         throw TrebuchetError.remoteInvocationFailed(
             "No streaming handler registered for actor type '\(type(of: actor))' and method '\(envelope.targetIdentifier)'"
         )
+    }
+}
+
+// MARK: - Server Stream Buffer
+
+/// Buffer for outgoing stream data to support resumption
+private actor ServerStreamBuffer {
+    private struct BufferedStream {
+        var recentData: [(sequence: UInt64, data: Data)] = []
+        var lastActivity: Date = Date()
+    }
+
+    private var buffers: [UUID: BufferedStream] = [:]
+    private let maxBufferSize: Int
+    private let ttl: TimeInterval
+
+    init(maxBufferSize: Int = 100, ttl: TimeInterval = 300) {
+        self.maxBufferSize = maxBufferSize
+        self.ttl = ttl
+    }
+
+    /// Buffer outgoing stream data
+    func buffer(streamID: UUID, sequence: UInt64, data: Data) {
+        var stream = buffers[streamID] ?? BufferedStream()
+        stream.recentData.append((sequence, data))
+        stream.lastActivity = Date()
+
+        // Keep only recent items
+        if stream.recentData.count > maxBufferSize {
+            stream.recentData.removeFirst()
+        }
+
+        buffers[streamID] = stream
+    }
+
+    /// Get buffered data for resumption
+    func getBufferedData(streamID: UUID, afterSequence: UInt64) -> [(sequence: UInt64, data: Data)]? {
+        guard let stream = buffers[streamID] else {
+            return nil
+        }
+
+        // Check if buffer is still valid (not expired)
+        if Date().timeIntervalSince(stream.lastActivity) > ttl {
+            buffers.removeValue(forKey: streamID)
+            return nil
+        }
+
+        // Return data after the given sequence
+        return stream.recentData.filter { $0.sequence > afterSequence }
+    }
+
+    /// Remove buffer for a completed stream
+    func removeBuffer(streamID: UUID) {
+        buffers.removeValue(forKey: streamID)
+    }
+
+    /// Clean up all buffers
+    func removeAllBuffers() {
+        buffers.removeAll()
     }
 }

@@ -66,18 +66,33 @@ public struct TrebuchetMacro: MemberMacro {
 
             // Generate observe method name: observePropertyName
             let observeMethodName = "observe\(propertyName.prefix(1).uppercased())\(propertyName.dropFirst())"
+            let removeMethodName = "_remove\(propertyName.prefix(1).uppercased())\(propertyName.dropFirst())Continuation"
 
-            // Generate actor-isolated async observe method
+            // Generate actor-isolated async observe method with cleanup
             let observeMethod: DeclSyntax = """
                 public func \(raw: observeMethodName)() async -> AsyncStream<\(propertyType)> {
                     return AsyncStream { continuation in
                         _\(raw: propertyName)_continuations.append(continuation)
                         continuation.yield(_\(raw: propertyName)_storage)
+
+                        continuation.onTermination = { @Sendable [weak self] _ in
+                            Task {
+                                await self?.\(raw: removeMethodName)(continuation)
+                            }
+                        }
                     }
                 }
                 """
 
+            // Generate helper method to remove continuation
+            let removeMethod: DeclSyntax = """
+                private func \(raw: removeMethodName)(_ continuation: AsyncStream<\(propertyType)>.Continuation) {
+                    _\(raw: propertyName)_continuations.removeAll { $0 === continuation }
+                }
+                """
+
             members.append(observeMethod)
+            members.append(removeMethod)
         }
 
         // Generate streaming method enum if there are streaming properties
