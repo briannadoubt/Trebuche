@@ -209,6 +209,10 @@ public final class TrebuchetServer: Sendable {
 
     /// Stop the server
     public func shutdown() async {
+        // Clean up all active streams
+        await actorSystem.streamRegistry.removeAllStreams()
+
+        // Shutdown transport
         await transport.shutdown()
     }
 
@@ -252,8 +256,8 @@ public final class TrebuchetServer: Sendable {
                 await handleStreamResume(resumeEnvelope, respond: message.respond)
 
             case .response, .streamStart, .streamData, .streamEnd, .streamError:
-                // Servers shouldn't receive these
-                print("Warning: Server received unexpected non-invocation envelope")
+                // Servers shouldn't receive these - silently ignore
+                break
             }
         } catch {
             // Try to extract callID from the message for error response
@@ -366,7 +370,8 @@ public final class TrebuchetServer: Sendable {
                     try await respond(envelopeData)
                 }
             } catch {
-                print("Error replaying buffered data: \(error)")
+                // Silently ignore replay errors - stream will restart
+                return
             }
         } else {
             // Buffer expired or stream not found - restart stream

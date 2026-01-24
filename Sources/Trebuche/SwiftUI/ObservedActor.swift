@@ -147,10 +147,12 @@ where Act.ID == TrebuchetActorID, Act.ActorSystem == TrebuchetActorSystem {
             Task { @MainActor in
                 lastConnectionState = currentConnectionState
 
-                // If disconnected, clean up
+                // If disconnected, clean up all tasks and state
                 if currentConnectionState?.isConnected != true {
                     streamTask?.cancel()
                     streamTask = nil
+                    resolutionTask?.cancel()
+                    resolutionTask = nil
                     resolvedActor = nil
                     currentState = nil
                     resolutionError = nil
@@ -212,11 +214,22 @@ where Act.ID == TrebuchetActorID, Act.ActorSystem == TrebuchetActorSystem {
 
     @MainActor
     private func startStreaming(actor: Act) {
-        // Cancel any existing stream
+        // Cancel any existing tasks before starting new ones
         streamTask?.cancel()
+        streamTask = nil
 
         streamTask = Task { @MainActor in
+            defer {
+                // Always clean up the task reference when done
+                if streamTask?.isCancelled != false {
+                    streamTask = nil
+                }
+            }
+
             do {
+                // Check for early cancellation
+                guard !Task.isCancelled else { return }
+
                 let stream: AsyncStream<State>
 
                 if let keyPath = observeKeyPath {
@@ -252,15 +265,17 @@ where Act.ID == TrebuchetActorID, Act.ActorSystem == TrebuchetActorSystem {
                     }
                     currentState = newState
                 }
+            } catch is CancellationError {
+                // Task was cancelled - this is expected, don't set error
+                return
             } catch let error as TrebuchetError {
-                resolutionError = error
+                if !Task.isCancelled {
+                    resolutionError = error
+                }
             } catch {
-                resolutionError = .remoteInvocationFailed(error.localizedDescription)
-            }
-
-            // Clean up when stream ends
-            if !Task.isCancelled {
-                streamTask = nil
+                if !Task.isCancelled {
+                    resolutionError = .remoteInvocationFailed(error.localizedDescription)
+                }
             }
         }
     }

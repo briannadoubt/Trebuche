@@ -234,20 +234,15 @@ public final class TrebuchetActorSystem: DistributedActorSystem, @unchecked Send
         // Transform the data stream into a typed stream
         return AsyncStream<Res> { continuation in
             Task {
-                print("[ActorSystem] Starting to iterate dataStream...")
                 for await dataItem in dataStream {
-                    print("[ActorSystem] Received dataItem (\(dataItem.count) bytes)")
                     do {
                         let value = try decoder.decode(Res.self, from: dataItem)
-                        print("[ActorSystem] Decoded value successfully, yielding to continuation")
                         continuation.yield(value)
                     } catch {
-                        print("[ActorSystem] Decode error: \(error)")
                         continuation.finish()
                         return
                     }
                 }
-                print("[ActorSystem] dataStream iteration completed, finishing outer stream")
                 continuation.finish()
             }
         }
@@ -350,31 +345,22 @@ public final class TrebuchetActorSystem: DistributedActorSystem, @unchecked Send
         envelope: InvocationEnvelope,
         returning: Res.Type
     ) async throws -> Res {
-        print("[ActorSystem] executeRemoteCall for method '\(envelope.targetIdentifier)'")
-
         guard let transport else {
-            print("[ActorSystem] ERROR: No transport configured")
             throw TrebuchetError.systemNotRunning
         }
 
         guard let host = envelope.actorID.host,
               let port = envelope.actorID.port else {
-            print("[ActorSystem] ERROR: Actor has no host/port: \(envelope.actorID)")
             throw TrebuchetError.actorNotFound(envelope.actorID)
         }
 
         // Send the invocation
-        print("[ActorSystem] Wrapping in TrebuchetEnvelope...")
         let trebuchetEnvelope = TrebuchetEnvelope.invocation(envelope)
-        print("[ActorSystem] Encoding invocation envelope...")
         let data = try encoder.encode(trebuchetEnvelope)
-        print("[ActorSystem] Sending \(data.count) bytes to \(host):\(port)...")
         try await transport.send(data, to: .init(host: host, port: port))
-        print("[ActorSystem] Message sent, waiting for response...")
 
         // Wait for response
         let response = try await registerPendingCall(id: envelope.callID)
-        print("[ActorSystem] Received response for callID \(envelope.callID)")
 
         if let errorMessage = response.errorMessage {
             throw TrebuchetError.remoteInvocationFailed(errorMessage)
@@ -395,31 +381,22 @@ public final class TrebuchetActorSystem: DistributedActorSystem, @unchecked Send
     }
 
     private func executeRemoteCallVoid(envelope: InvocationEnvelope) async throws {
-        print("[ActorSystem] executeRemoteCallVoid for method '\(envelope.targetIdentifier)'")
-
         guard let transport else {
-            print("[ActorSystem] ERROR: No transport configured")
             throw TrebuchetError.systemNotRunning
         }
 
         guard let host = envelope.actorID.host,
               let port = envelope.actorID.port else {
-            print("[ActorSystem] ERROR: Actor has no host/port: \(envelope.actorID)")
             throw TrebuchetError.actorNotFound(envelope.actorID)
         }
 
         // Send the invocation
-        print("[ActorSystem] Wrapping in TrebuchetEnvelope...")
         let trebuchetEnvelope = TrebuchetEnvelope.invocation(envelope)
-        print("[ActorSystem] Encoding invocation envelope...")
         let data = try encoder.encode(trebuchetEnvelope)
-        print("[ActorSystem] Sending \(data.count) bytes to \(host):\(port)...")
         try await transport.send(data, to: .init(host: host, port: port))
-        print("[ActorSystem] Message sent, waiting for response...")
 
         // Wait for response
         let response = try await registerPendingCall(id: envelope.callID)
-        print("[ActorSystem] Received response for callID \(envelope.callID)")
 
         if let errorMessage = response.errorMessage {
             throw TrebuchetError.remoteInvocationFailed(errorMessage)

@@ -12,6 +12,7 @@ public actor StreamRegistry {
         let callID: UUID
         var recentData: [(sequence: UInt64, data: Data)] = []
         var pendingData: [(sequence: UInt64, data: Data)] = []
+        var lastActivity: Date
 
         init(streamID: UUID, callID: UUID) {
             self.continuation = nil
@@ -20,6 +21,7 @@ public actor StreamRegistry {
             self.decoder.dateDecodingStrategy = .iso8601
             self.streamID = streamID
             self.callID = callID
+            self.lastActivity = Date()
         }
 
         mutating func buffer(_ data: Data, sequence: UInt64, maxBufferSize: Int) {
@@ -29,6 +31,10 @@ public actor StreamRegistry {
                 recentData.removeFirst()
             }
         }
+
+        mutating func updateActivity() {
+            lastActivity = Date()
+        }
     }
 
     private var streams: [UUID: StreamState] = [:]
@@ -37,12 +43,42 @@ public actor StreamRegistry {
     /// Maximum number of recent data items to buffer for catch-up
     private let maxBufferSize: Int
 
-    public init(maxBufferSize: Int = 100) {
+    /// Time-to-live for inactive streams (in seconds)
+    private let streamTTL: TimeInterval
+
+    /// Cleanup task handle
+    private var cleanupTask: Task<Void, Never>?
+
+    /// Whether cleanup task has been started
+    private var cleanupStarted = false
+
+    public init(maxBufferSize: Int = 100, streamTTL: TimeInterval = 300) {
         self.maxBufferSize = maxBufferSize
+        self.streamTTL = streamTTL
+    }
+
+    deinit {
+        cleanupTask?.cancel()
+    }
+
+    /// Start the periodic cleanup task (called automatically on first stream creation)
+    private func startCleanupTaskIfNeeded() {
+        guard !cleanupStarted else { return }
+        cleanupStarted = true
+
+        cleanupTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                await self?.cleanupStaleStreams()
+            }
+        }
     }
 
     /// Create a new remote stream for receiving data
     public func createRemoteStream(callID: UUID) -> (streamID: UUID, stream: AsyncStream<Data>) {
+        // Start cleanup task on first stream creation
+        startCleanupTaskIfNeeded()
+
         let streamID = UUID()
 
         // Pre-register the stream before creating the AsyncStream
@@ -67,21 +103,24 @@ public actor StreamRegistry {
     }
 
     private func registerContinuation(_ continuation: AsyncStream<Data>.Continuation, streamID: UUID) {
-        guard var state = streams[streamID] else {
+        guard streams[streamID] != nil else {
             // Stream was removed before continuation was registered
             continuation.finish()
             return
         }
 
-        state.continuation = continuation
+        // Update activity timestamp
+        streams[streamID]?.updateActivity()
+
+        // Set continuation
+        streams[streamID]?.continuation = continuation
 
         // Flush any pending data that arrived before the continuation was ready
-        for (_, data) in state.pendingData {
+        let pendingData = streams[streamID]?.pendingData ?? []
+        for (_, data) in pendingData {
             continuation.yield(data)
         }
-        state.pendingData.removeAll()
-
-        streams[streamID] = state
+        streams[streamID]?.pendingData.removeAll()
     }
 
     /// Handle a StreamStartEnvelope from the server
@@ -104,31 +143,34 @@ public actor StreamRegistry {
 
     /// Handle a StreamDataEnvelope and yield to the appropriate stream
     public func handleStreamData(_ envelope: StreamDataEnvelope) {
-        guard var state = streams[envelope.streamID] else {
+        guard streams[envelope.streamID] != nil else {
             // Stream not found, possibly already terminated
             return
         }
 
         // Check sequence number to prevent duplicates/out-of-order delivery
-        guard envelope.sequenceNumber > state.sequenceNumber else {
+        if let currentSeq = streams[envelope.streamID]?.sequenceNumber,
+           envelope.sequenceNumber <= currentSeq {
             // Duplicate or out-of-order message, ignore
             return
         }
 
-        state.sequenceNumber = envelope.sequenceNumber
+        // Update activity timestamp
+        streams[envelope.streamID]?.updateActivity()
+
+        // Update sequence number (in-place mutation to avoid copy-on-write issues)
+        streams[envelope.streamID]?.sequenceNumber = envelope.sequenceNumber
 
         // Buffer for potential resumption
-        state.buffer(envelope.data, sequence: envelope.sequenceNumber, maxBufferSize: maxBufferSize)
+        streams[envelope.streamID]?.buffer(envelope.data, sequence: envelope.sequenceNumber, maxBufferSize: maxBufferSize)
 
         // If continuation is ready, yield immediately
-        if let continuation = state.continuation {
+        if let continuation = streams[envelope.streamID]?.continuation {
             continuation.yield(envelope.data)
         } else {
             // Continuation not ready yet, buffer the data
-            state.pendingData.append((envelope.sequenceNumber, envelope.data))
+            streams[envelope.streamID]?.pendingData.append((envelope.sequenceNumber, envelope.data))
         }
-
-        streams[envelope.streamID] = state
     }
 
     /// Handle a StreamEndEnvelope and finish the stream
@@ -166,6 +208,25 @@ public actor StreamRegistry {
     /// Get stream ID for a call ID
     public func streamID(for callID: UUID) -> UUID? {
         callIDToStreamID[callID]
+    }
+
+    /// Clean up stale streams that haven't had activity within TTL
+    private func cleanupStaleStreams() {
+        let now = Date()
+        var staleStreamIDs: [UUID] = []
+
+        for (streamID, state) in streams {
+            if now.timeIntervalSince(state.lastActivity) > streamTTL {
+                staleStreamIDs.append(streamID)
+            }
+        }
+
+        for streamID in staleStreamIDs {
+            if let state = streams[streamID] {
+                state.continuation?.finish()
+            }
+            removeStreamInternal(streamID: streamID)
+        }
     }
 
     /// Remove all streams (for cleanup)
