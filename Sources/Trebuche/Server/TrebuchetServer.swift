@@ -29,6 +29,9 @@ public final class TrebuchetServer: Sendable {
     /// Buffer for outgoing stream data (for resumption support)
     private let streamBuffer = ServerStreamBuffer()
 
+    /// Filter state for stateful filters (like "changed")
+    private let filterState = StreamFilterState()
+
     /// Create a new server with the specified transport
     /// - Parameter transport: The transport configuration (e.g., `.webSocket(port: 8080)`)
     public init(transport: TransportConfiguration) {
@@ -221,6 +224,9 @@ public final class TrebuchetServer: Sendable {
         // Clean up all stream buffers
         await streamBuffer.removeAllBuffers()
 
+        // Clean up filter state
+        await filterState.clearAllState()
+
         // Shutdown transport
         await transport.shutdown()
     }
@@ -308,14 +314,18 @@ public final class TrebuchetServer: Sendable {
 
             // Run stream iteration in background task to avoid blocking the message handler
             let buffer = streamBuffer
+            let filterStateManager = filterState
             let filter = envelope.streamFilter
             Task {
                 do {
                     var sequenceNumber: UInt64 = 0
                     for try await data in stream {
                         // Apply filter before sending (if specified)
-                        if let filter = filter, !filter.matches(data) {
-                            continue  // Skip this update
+                        if let filter = filter {
+                            let passes = await filterStateManager.matches(filter, data: data, streamID: streamID)
+                            if !passes {
+                                continue  // Skip this update
+                            }
                         }
 
                         sequenceNumber += 1
@@ -341,8 +351,9 @@ public final class TrebuchetServer: Sendable {
                     let endData = try encoder.encode(endEnvelope)
                     try await respond(endData)
 
-                    // Clean up buffer
+                    // Clean up buffer and filter state
                     await buffer.removeBuffer(streamID: streamID)
+                    await filterStateManager.clearState(for: streamID)
                 } catch {
                     // Send error envelope
                     let errorEnvelope = TrebuchetEnvelope.streamError(
@@ -354,6 +365,10 @@ public final class TrebuchetServer: Sendable {
                     if let errorData = try? encoder.encode(errorEnvelope) {
                         try? await respond(errorData)
                     }
+
+                    // Clean up buffer and filter state on error
+                    await buffer.removeBuffer(streamID: streamID)
+                    await filterStateManager.clearState(for: streamID)
                 }
             }
 
