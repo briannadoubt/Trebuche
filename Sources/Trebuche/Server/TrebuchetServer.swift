@@ -174,13 +174,16 @@ public final class TrebuchetServer: Sendable {
     ///     }
     /// }
     /// ```
-    public func configureStreaming<T, Method: RawRepresentable & CaseIterable, State: Codable & Sendable>(
+    public func configureStreaming<T, Method, State: Codable & Sendable>(
         for protocolType: T.Type,
         handler: @escaping @Sendable (Method, T) async throws -> AsyncStream<State>
-    ) async where Method.RawValue == String {
+    ) async where Method: RawRepresentable & CaseIterable & Sendable, Method.RawValue == String {
+        // Capture all cases outside the closure to avoid Sendable warnings
+        let allCases = Array(Method.allCases)
+
         await configureStreaming(for: protocolType) { envelope, actor in
             // Try to parse the target identifier as an enum case
-            guard let method = Method.allCases.first(where: { $0.rawValue == envelope.targetIdentifier }) else {
+            guard let method = allCases.first(where: { $0.rawValue == envelope.targetIdentifier }) else {
                 throw TrebuchetError.remoteInvocationFailed("Unknown streaming method: \(envelope.targetIdentifier)")
             }
             return Self.encodeStream(try await handler(method, actor))

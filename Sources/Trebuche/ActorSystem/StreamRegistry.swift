@@ -89,7 +89,7 @@ public actor StreamRegistry {
 
         let stream = AsyncStream<Data> { continuation in
             Task {
-                await self.registerContinuation(continuation, streamID: streamID)
+                self.registerContinuation(continuation, streamID: streamID)
 
                 continuation.onTermination = { @Sendable [weak self] _ in
                     Task {
