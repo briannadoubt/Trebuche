@@ -78,7 +78,7 @@ public struct TrebuchetMacro: MemberMacro {
                         _\(raw: propertyName)_continuations[id] = continuation
                         continuation.yield(_\(raw: propertyName)_storage)
 
-                        continuation.onTermination = { @Sendable [id] _ in
+                        continuation.onTermination = { @Sendable [id, self] _ in
                             Task {
                                 try? await self.\(raw: cleanupMethodName)(id)
                             }
