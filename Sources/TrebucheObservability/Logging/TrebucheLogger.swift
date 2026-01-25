@@ -151,6 +151,10 @@ public actor TrebucheLogger {
 }
 
 /// Default output handler that prints to stderr
+///
+/// Note: stderr is accessed using nonisolated(unsafe) because writes to stderr
+/// are thread-safe at the OS level, despite being exposed as mutable state.
 public let defaultOutput: @Sendable (String) -> Void = { message in
-    fputs(message + "\n", stderr)
+    nonisolated(unsafe) let fileHandle = stderr
+    fputs(message + "\n", fileHandle)
 }
