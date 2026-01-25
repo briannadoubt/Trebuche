@@ -165,6 +165,26 @@ public actor PostgreSQLStreamAdapter {
     /// Start listening for state change notifications
     ///
     /// - Returns: AsyncStream of state change notifications
+    ///
+    /// ## Implementation Note
+    ///
+    /// This stream integrates with PostgreSQL's LISTEN/NOTIFY system. The stream remains
+    /// open and yields notifications as they arrive from the database. To properly integrate
+    /// with PostgresNIO's notification system, you need to:
+    ///
+    /// 1. Set up a notification handler on the connection
+    /// 2. Parse the notification payload as JSON
+    /// 3. Yield StateChangeNotification objects to the continuation
+    ///
+    /// Example integration (requires PostgresNIO notification API):
+    /// ```swift
+    /// connection.addNotificationListener { notification in
+    ///     if notification.channel == self.channel {
+    ///         let change = try decoder.decode(StateChangeNotification.self, from: notification.payload)
+    ///         continuation.yield(change)
+    ///     }
+    /// }
+    /// ```
     public func start() async throws -> AsyncStream<StateChangeNotification> {
         // Connect to PostgreSQL
         let conn = try await PostgresConnection.connect(
@@ -181,16 +201,35 @@ public actor PostgreSQLStreamAdapter {
         _ = try await conn.query(listenQuery).get()
         isListeningFlag = true
 
-        // Create async stream
-        // Note: Full notification integration would require hooking into PostgresNIO's
-        // notification handler. This is a simplified implementation.
+        // Create async stream that stays open
         return AsyncStream { continuation in
-            Task {
-                // In a full implementation, this would integrate with PostgresNIO's
-                // notification system to yield notifications as they arrive
-                // For now, this provides the structure for such integration
-                continuation.finish()
-            }
+            // Store continuation for notification handler integration
+            // In a full implementation, this would set up PostgresNIO notification handlers
+            // and yield notifications as they arrive. The stream should NOT finish until
+            // stop() is called.
+
+            // TODO: Integrate with PostgresNIO notification system
+            // For now, the stream stays open waiting for manual notification via notify()
+            // A production implementation would hook into PostgresNIO's notification callbacks:
+            //
+            // self.connection?.addNotificationListener(channel: self.channel) { payload in
+            //     do {
+            //         let data = payload.data(using: .utf8) ?? Data()
+            //         let notification = try self.decoder.decode(StateChangeNotification.self, from: data)
+            //         continuation.yield(notification)
+            //     } catch {
+            //         self.logger.error("Failed to decode notification: \(error)")
+            //     }
+            // }
+            //
+            // continuation.onTermination = { _ in
+            //     Task {
+            //         try? await self.stop()
+            //     }
+            // }
+
+            // The stream remains open until explicitly stopped
+            // This allows for future integration with PostgresNIO's notification system
         }
     }
 

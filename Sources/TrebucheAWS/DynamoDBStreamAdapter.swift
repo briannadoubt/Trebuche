@@ -229,23 +229,36 @@ public actor DynamoDBStreamAdapter {
         // Get sequence number from DynamoDB stream or state
         let sequenceNumber = extractSequenceNumber(from: record, or: newImage)
 
-        // Create a stream ID (in production, this would be tracked per subscription)
-        // For now, we use a deterministic ID based on actor
-        let streamID = UUID()
+        // Get all connections subscribed to this actor
+        let connections = try await connectionManager.getConnections(for: actorID)
 
-        // Create StreamDataEnvelope
-        let envelope = StreamDataEnvelope(
-            streamID: streamID,
-            sequenceNumber: sequenceNumber,
-            data: stateData,
-            timestamp: Date()
-        )
+        // Send updates to each connection using their registered stream ID
+        for connection in connections {
+            // Only send to connections with active stream subscriptions
+            guard let streamID = connection.streamID else {
+                continue
+            }
 
-        // Encode and broadcast to all connections for this actor
-        let envelopeData = try encoder.encode(TrebuchetEnvelope.streamData(envelope))
-        try await connectionManager.broadcast(data: envelopeData, to: actorID)
+            // Create StreamDataEnvelope using the connection's stream ID
+            let envelope = StreamDataEnvelope(
+                streamID: streamID,
+                sequenceNumber: sequenceNumber,
+                data: stateData,
+                timestamp: Date()
+            )
 
-        print("Broadcasted state change for actor \(actorID) (seq: \(sequenceNumber))")
+            // Encode and send to this specific connection
+            let envelopeData = try encoder.encode(TrebuchetEnvelope.streamData(envelope))
+
+            do {
+                try await connectionManager.send(data: envelopeData, to: connection.connectionID)
+            } catch {
+                // Log error but continue sending to other connections
+                print("Failed to send to connection \(connection.connectionID): \(error)")
+            }
+        }
+
+        print("Broadcasted state change for actor \(actorID) to \(connections.count) connections (seq: \(sequenceNumber))")
     }
 
     // MARK: - Extraction Helpers

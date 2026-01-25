@@ -4,6 +4,7 @@ import FoundationNetworking
 #endif
 import Trebuche
 import TrebucheCloud
+import CryptoKit
 
 // MARK: - API Gateway Connection Sender
 
@@ -73,10 +74,8 @@ public actor APIGatewayConnectionSender: ConnectionSender {
         request.httpBody = data
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        // Simplified auth - production should use AWS Signature V4
-        if let accessKey = credentials.accessKeyId {
-            request.setValue(accessKey, forHTTPHeaderField: "X-Amz-Access-Key")
-        }
+        // Sign request with AWS Signature V4
+        signRequest(&request, payload: data)
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -115,10 +114,8 @@ public actor APIGatewayConnectionSender: ConnectionSender {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
 
-        // Simplified auth
-        if let accessKey = credentials.accessKeyId {
-            request.setValue(accessKey, forHTTPHeaderField: "X-Amz-Access-Key")
-        }
+        // Sign request with AWS Signature V4
+        signRequest(&request, payload: nil)
 
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -152,9 +149,8 @@ public actor APIGatewayConnectionSender: ConnectionSender {
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
 
-        if let accessKey = credentials.accessKeyId {
-            request.setValue(accessKey, forHTTPHeaderField: "X-Amz-Access-Key")
-        }
+        // Sign request with AWS Signature V4
+        signRequest(&request, payload: nil)
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -165,6 +161,25 @@ public actor APIGatewayConnectionSender: ConnectionSender {
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 410 else {
             throw ConnectionError.sendFailed("API Gateway disconnect error: \(httpResponse.statusCode)")
         }
+    }
+
+    // MARK: - Request Signing
+
+    /// Sign a request with AWS Signature V4
+    private func signRequest(_ request: inout URLRequest, payload: Data?) {
+        guard let accessKey = credentials.accessKeyId,
+              let secretKey = credentials.secretAccessKey else {
+            // No credentials available - request will likely fail with 403
+            return
+        }
+
+        let signer = AWSSigV4Signer(
+            accessKey: accessKey,
+            secretKey: secretKey,
+            region: region
+        )
+
+        signer.sign(&request, payload: payload)
     }
 
     /// Get connection information
@@ -183,9 +198,8 @@ public actor APIGatewayConnectionSender: ConnectionSender {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
 
-        if let accessKey = credentials.accessKeyId {
-            request.setValue(accessKey, forHTTPHeaderField: "X-Amz-Access-Key")
-        }
+        // Sign request with AWS Signature V4
+        signRequest(&request, payload: nil)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -222,5 +236,150 @@ public struct ConnectionInfo: Codable, Sendable {
         case connectedAt
         case sourceIp = "identity.sourceIp"
         case userAgent = "identity.userAgent"
+    }
+}
+
+// MARK: - AWS Signature V4
+
+/// AWS Signature Version 4 signing implementation
+///
+/// This implements the AWS SigV4 signing process required for API Gateway Management API requests.
+///
+/// References:
+/// - https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
+/// - https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-how-to-call-websocket-api-connections.html
+private struct AWSSigV4Signer {
+    let accessKey: String
+    let secretKey: String
+    let region: String
+    let service: String = "execute-api"
+
+    /// Sign a URLRequest with AWS Signature V4
+    func sign(_ request: inout URLRequest, payload: Data?) {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let dateStamp = String(timestamp.prefix(8))  // YYYYMMDD
+
+        guard let url = request.url,
+              let host = url.host else {
+            return
+        }
+
+        // Add required headers
+        request.setValue(host, forHTTPHeaderField: "Host")
+        request.setValue(timestamp, forHTTPHeaderField: "X-Amz-Date")
+
+        // Create canonical request
+        let method = request.httpMethod ?? "GET"
+        let canonicalUri = url.path.isEmpty ? "/" : url.path
+        let canonicalQueryString = createCanonicalQueryString(from: url)
+        let canonicalHeaders = createCanonicalHeaders(from: request)
+        let signedHeaders = "host;x-amz-date"
+
+        let payloadHash: String
+        if let payload = payload {
+            payloadHash = sha256(data: payload)
+        } else {
+            payloadHash = sha256(data: Data())
+        }
+
+        let canonicalRequest = """
+        \(method)
+        \(canonicalUri)
+        \(canonicalQueryString)
+        \(canonicalHeaders)
+
+        \(signedHeaders)
+        \(payloadHash)
+        """
+
+        // Create string to sign
+        let credentialScope = "\(dateStamp)/\(region)/\(service)/aws4_request"
+        let hashedCanonicalRequest = sha256(string: canonicalRequest)
+        let stringToSign = """
+        AWS4-HMAC-SHA256
+        \(timestamp)
+        \(credentialScope)
+        \(hashedCanonicalRequest)
+        """
+
+        // Calculate signature
+        let signature = calculateSignature(
+            stringToSign: stringToSign,
+            dateStamp: dateStamp,
+            secretKey: secretKey
+        )
+
+        // Create authorization header
+        let authorizationHeader = """
+        AWS4-HMAC-SHA256 Credential=\(accessKey)/\(credentialScope), \
+        SignedHeaders=\(signedHeaders), \
+        Signature=\(signature)
+        """
+
+        request.setValue(authorizationHeader, forHTTPHeaderField: "Authorization")
+    }
+
+    // MARK: - Helper Methods
+
+    private func createCanonicalQueryString(from url: URL) -> String {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let queryItems = components.queryItems else {
+            return ""
+        }
+
+        return queryItems
+            .sorted { $0.name < $1.name }
+            .map { "\($0.name)=\(urlEncode($0.value ?? ""))" }
+            .joined(separator: "&")
+    }
+
+    private func createCanonicalHeaders(from request: URLRequest) -> String {
+        var headers: [(String, String)] = []
+
+        if let host = request.value(forHTTPHeaderField: "Host") {
+            headers.append(("host", host))
+        }
+        if let date = request.value(forHTTPHeaderField: "X-Amz-Date") {
+            headers.append(("x-amz-date", date))
+        }
+
+        return headers
+            .sorted { $0.0 < $1.0 }
+            .map { "\($0.0):\($0.1)" }
+            .joined(separator: "\n")
+    }
+
+    private func calculateSignature(
+        stringToSign: String,
+        dateStamp: String,
+        secretKey: String
+    ) -> String {
+        let kDate = hmac(key: "AWS4\(secretKey)".data(using: .utf8)!, data: dateStamp.data(using: .utf8)!)
+        let kRegion = hmac(key: kDate, data: region.data(using: .utf8)!)
+        let kService = hmac(key: kRegion, data: service.data(using: .utf8)!)
+        let kSigning = hmac(key: kService, data: "aws4_request".data(using: .utf8)!)
+        let signature = hmac(key: kSigning, data: stringToSign.data(using: .utf8)!)
+
+        return signature.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func sha256(data: Data) -> String {
+        let hash = SHA256.hash(data: data)
+        return hash.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func sha256(string: String) -> String {
+        sha256(data: string.data(using: .utf8)!)
+    }
+
+    private func hmac(key: Data, data: Data) -> Data {
+        let symmetricKey = SymmetricKey(data: key)
+        let authenticationCode = HMAC<SHA256>.authenticationCode(for: data, using: symmetricKey)
+        return Data(authenticationCode)
+    }
+
+    private func urlEncode(_ string: String) -> String {
+        let allowedCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_.~"))
+        return string.addingPercentEncoding(withAllowedCharacters: allowedCharacters) ?? string
     }
 }

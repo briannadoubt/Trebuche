@@ -16,9 +16,13 @@ struct ChangeStreamTests {
         let manager = ConnectionManager(storage: storage, sender: sender)
         let adapter = DynamoDBStreamAdapter(connectionManager: manager)
 
-        // Register connections
+        // Register connections and subscribe to streams
+        let streamID1 = UUID()
+        let streamID2 = UUID()
         try await manager.register(connectionID: "conn-1", actorID: "actor-1")
         try await manager.register(connectionID: "conn-2", actorID: "actor-1")
+        try await manager.subscribe(connectionID: "conn-1", streamID: streamID1, actorID: "actor-1")
+        try await manager.subscribe(connectionID: "conn-2", streamID: streamID2, actorID: "actor-1")
         await sender.markAlive("conn-1")
         await sender.markAlive("conn-2")
 
@@ -70,8 +74,10 @@ struct ChangeStreamTests {
         let manager = ConnectionManager(storage: storage, sender: sender)
         let adapter = DynamoDBStreamAdapter(connectionManager: manager)
 
-        // Register connection
+        // Register connection and subscribe to stream
+        let streamID = UUID()
         try await manager.register(connectionID: "conn-1", actorID: "actor-1")
+        try await manager.subscribe(connectionID: "conn-1", streamID: streamID, actorID: "actor-1")
         await sender.markAlive("conn-1")
 
         // Create MODIFY event
@@ -158,8 +164,10 @@ struct ChangeStreamTests {
         let manager = ConnectionManager(storage: storage, sender: sender)
         let adapter = DynamoDBStreamAdapter(connectionManager: manager)
 
-        // Register connection
+        // Register connection and subscribe to stream
+        let streamID = UUID()
         try await manager.register(connectionID: "conn-1", actorID: "actor-1")
+        try await manager.subscribe(connectionID: "conn-1", streamID: streamID, actorID: "actor-1")
         await sender.markAlive("conn-1")
 
         // Create batch event with multiple records
@@ -274,8 +282,10 @@ struct ChangeStreamTests {
         let manager = ConnectionManager(storage: storage, sender: sender)
         let handler = StreamProcessorHandler.initialize(connectionManager: manager)
 
-        // Register connection
+        // Register connection and subscribe to stream
+        let streamID = UUID()
         try await manager.register(connectionID: "conn-1", actorID: "actor-1")
+        try await manager.subscribe(connectionID: "conn-1", streamID: streamID, actorID: "actor-1")
         await sender.markAlive("conn-1")
 
         // Create event
@@ -309,8 +319,10 @@ struct ChangeStreamTests {
         let manager = ConnectionManager(storage: storage, sender: sender)
         let handler = StreamProcessorHandler.initialize(connectionManager: manager)
 
-        // Register connection
+        // Register connection and subscribe to stream
+        let streamID = UUID()
         try await manager.register(connectionID: "conn-1", actorID: "actor-1")
+        try await manager.subscribe(connectionID: "conn-1", streamID: streamID, actorID: "actor-1")
         await sender.markAlive("conn-1")
 
         // Create record
@@ -367,9 +379,13 @@ struct ChangeStreamTests {
         let manager = ConnectionManager(storage: storage, sender: sender)
         let adapter = DynamoDBStreamAdapter(connectionManager: manager)
 
-        // Register WebSocket connections for actor
+        // Register WebSocket connections and subscribe to streams
+        let streamID1 = UUID()
+        let streamID2 = UUID()
         try await manager.register(connectionID: "client-1", actorID: "todo-list")
         try await manager.register(connectionID: "client-2", actorID: "todo-list")
+        try await manager.subscribe(connectionID: "client-1", streamID: streamID1, actorID: "todo-list")
+        try await manager.subscribe(connectionID: "client-2", streamID: streamID2, actorID: "todo-list")
         await sender.markAlive("client-1")
         await sender.markAlive("client-2")
 
