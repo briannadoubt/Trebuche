@@ -273,6 +273,17 @@ public actor PostgreSQLStateStore: ActorStateStore {
 
     // MARK: - Connection Management
 
+    /// Execute an operation with a PostgreSQL connection.
+    ///
+    /// Creates a new connection, executes the operation, and ensures the connection
+    /// is closed even if the operation throws an error.
+    ///
+    /// - Parameter operation: The operation to execute with the connection
+    /// - Returns: The result of the operation
+    /// - Throws: Any error from connection creation or the operation
+    ///
+    /// - Note: For production use with high concurrency, consider implementing
+    ///   connection pooling to avoid creating a new connection per operation.
     private func withConnection<T>(_ operation: @Sendable (PostgresConnection) async throws -> T) async throws -> T {
         let connection = try await PostgresConnection.connect(
             on: eventLoopGroup.any(),
@@ -281,13 +292,15 @@ public actor PostgreSQLStateStore: ActorStateStore {
             logger: logger
         )
 
-        defer {
-            Task {
-                try? await connection.close()
-            }
+        do {
+            let result = try await operation(connection)
+            try await connection.close()
+            return result
+        } catch {
+            // Ensure connection closes even on error
+            try? await connection.close()
+            throw error
         }
-
-        return try await operation(connection)
     }
 }
 
@@ -298,6 +311,7 @@ public enum PostgreSQLError: Error, CustomStringConvertible {
     case connectionFailed(underlying: Error)
     case queryFailed(String)
     case sequenceRetrievalFailed
+    case invalidChannelName(String)
 
     public var description: String {
         switch self {
@@ -309,6 +323,8 @@ public enum PostgreSQLError: Error, CustomStringConvertible {
             return "PostgreSQL query failed: \(message)"
         case .sequenceRetrievalFailed:
             return "Failed to retrieve sequence number after insert"
+        case .invalidChannelName(let name):
+            return "Invalid PostgreSQL channel name '\(name)': must start with letter/underscore and contain only letters, digits, underscores, and hyphens (max 63 chars)"
         }
     }
 }

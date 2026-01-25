@@ -106,6 +106,7 @@ public actor PostgreSQLStreamAdapter {
     ///   - password: Password (optional)
     ///   - channel: PostgreSQL notification channel (default: "actor_state_changes")
     ///   - eventLoopGroup: NIO event loop group (creates default if not provided)
+    /// - Throws: PostgreSQLError.invalidChannelName if channel contains invalid characters
     public init(
         host: String = "localhost",
         port: Int = 5432,
@@ -115,6 +116,11 @@ public actor PostgreSQLStreamAdapter {
         channel: String = "actor_state_changes",
         eventLoopGroup: EventLoopGroup? = nil
     ) async throws {
+        // Validate channel name to prevent SQL injection
+        guard Self.isValidIdentifier(channel) else {
+            throw PostgreSQLError.invalidChannelName(channel)
+        }
+
         self.eventLoopGroup = eventLoopGroup ?? MultiThreadedEventLoopGroup(numberOfThreads: 1)
         self.channel = channel
         self.logger = Logger(label: "com.trebuche.postgresql.stream")
@@ -130,6 +136,30 @@ public actor PostgreSQLStreamAdapter {
 
         self.decoder = JSONDecoder()
         self.decoder.dateDecodingStrategy = .secondsSince1970
+    }
+
+    /// Validates that an identifier is safe for use in SQL queries.
+    ///
+    /// PostgreSQL identifiers must start with a letter or underscore,
+    /// and contain only letters, digits, underscores, and hyphens.
+    ///
+    /// - Parameter identifier: The identifier to validate
+    /// - Returns: true if the identifier is safe to use
+    private static func isValidIdentifier(_ identifier: String) -> Bool {
+        guard !identifier.isEmpty, identifier.count <= 63 else {
+            return false  // PostgreSQL identifier max length is 63
+        }
+
+        // Must start with letter or underscore
+        guard let first = identifier.first,
+              first.isLetter || first == "_" else {
+            return false
+        }
+
+        // Rest must be letters, digits, underscores, or hyphens
+        return identifier.allSatisfy { char in
+            char.isLetter || char.isNumber || char == "_" || char == "-"
+        }
     }
 
     /// Start listening for state change notifications

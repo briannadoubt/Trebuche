@@ -4,6 +4,7 @@ import FoundationNetworking
 #endif
 import Trebuche
 import TrebucheCloud
+import TrebucheObservability
 
 // MARK: - DynamoDB Connection Storage
 
@@ -54,17 +55,47 @@ public actor DynamoDBConnectionStorage: ConnectionStorage {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let endpoint: String?
+    private let ttl: TimeInterval
+    private let metrics: (any MetricsCollector)?
 
+    /// Initialize DynamoDB connection storage
+    ///
+    /// - Parameters:
+    ///   - tableName: DynamoDB table name
+    ///   - region: AWS region (default: "us-east-1")
+    ///   - credentials: AWS credentials (default: .default uses standard credential chain)
+    ///   - endpoint: Custom endpoint URL for testing (default: nil uses AWS endpoint)
+    ///   - ttl: Time-to-live for connections in seconds (default: 86400 = 24 hours)
+    ///   - metrics: Optional metrics collector for observability
+    ///
+    /// ## AWS Credentials
+    ///
+    /// The `.default` credentials follow standard AWS credential resolution:
+    /// 1. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    /// 2. Shared credentials file (~/.aws/credentials)
+    /// 3. IAM role (when running on EC2/Lambda)
+    ///
+    /// ## TTL Configuration
+    ///
+    /// The TTL value determines how long connection records remain in DynamoDB
+    /// before automatic cleanup. Adjust based on your connection patterns:
+    /// - Short-lived connections (dev/test): 3600 (1 hour)
+    /// - Production connections: 86400 (24 hours, default)
+    /// - Long-lived connections: 604800 (7 days)
     public init(
         tableName: String,
         region: String = "us-east-1",
         credentials: AWSCredentials = .default,
-        endpoint: String? = nil
+        endpoint: String? = nil,
+        ttl: TimeInterval = 86400,
+        metrics: (any MetricsCollector)? = nil
     ) {
         self.tableName = tableName
         self.region = region
         self.credentials = credentials
         self.endpoint = endpoint
+        self.ttl = ttl
+        self.metrics = metrics
 
         self.encoder = JSONEncoder()
         self.encoder.dateEncodingStrategy = .iso8601
@@ -116,20 +147,61 @@ public actor DynamoDBConnectionStorage: ConnectionStorage {
     }
 
     public func getConnections(for actorID: String) async throws -> [Connection] {
-        // Query using the actorId-index GSI
-        let request = DynamoDBQueryRequest(
-            tableName: tableName,
-            indexName: "actorId-index",
-            keyConditionExpression: "actorId = :actorId",
-            expressionAttributeValues: [
-                ":actorId": .string(actorID)
-            ]
-        )
+        let startTime = Date()
 
-        let response = try await executeQuery(request)
+        do {
+            // Query using the actorId-index GSI
+            // Use projection expression to reduce data read and lower costs
+            let request = DynamoDBQueryRequest(
+                tableName: tableName,
+                indexName: "actorId-index",
+                keyConditionExpression: "actorId = :actorId",
+                expressionAttributeValues: [
+                    ":actorId": .string(actorID)
+                ],
+                projectionExpression: "connectionId, actorId, streamId, lastSequence, connectedAt"
+            )
 
-        return try response.items.map { item in
-            try parseConnection(from: item)
+            let response = try await executeQuery(request)
+
+            let connections = try response.items.map { item in
+                try parseConnection(from: item)
+            }
+
+            // Record success metrics
+            if let metrics = metrics {
+                let duration = Date().timeIntervalSince(startTime)
+                await metrics.recordHistogramMilliseconds(
+                    "trebuche.dynamodb.operation.latency",
+                    milliseconds: duration * 1000,
+                    tags: [
+                        "operation": "Query",
+                        "table": tableName,
+                        "index": "actorId-index"
+                    ]
+                )
+                await metrics.incrementCounter(
+                    "trebuche.dynamodb.operation.count",
+                    tags: [
+                        "operation": "Query",
+                        "status": "success"
+                    ]
+                )
+            }
+
+            return connections
+        } catch {
+            // Record error metrics
+            if let metrics = metrics {
+                await metrics.incrementCounter(
+                    "trebuche.dynamodb.operation.count",
+                    tags: [
+                        "operation": "Query",
+                        "status": "error"
+                    ]
+                )
+            }
+            throw error
         }
     }
 
@@ -172,8 +244,8 @@ public actor DynamoDBConnectionStorage: ConnectionStorage {
             "connectionId": .string(connection.connectionID),
             "connectedAt": .number("\(Int(connection.connectedAt.timeIntervalSince1970))"),
             "lastSequence": .number("\(connection.lastSequence)"),
-            // TTL: 24 hours from now
-            "ttl": .number("\(Int(Date().timeIntervalSince1970) + 86400)")
+            // TTL: configurable expiration from now
+            "ttl": .number("\(Int(Date().timeIntervalSince1970 + ttl))")
         ]
 
         if let streamID = connection.streamID {
@@ -330,12 +402,14 @@ struct DynamoDBQueryRequest: Codable {
     let indexName: String?
     let keyConditionExpression: String
     let expressionAttributeValues: [String: DynamoDBAttributeValue]
+    let projectionExpression: String?
 
     enum CodingKeys: String, CodingKey {
         case tableName = "TableName"
         case indexName = "IndexName"
         case keyConditionExpression = "KeyConditionExpression"
         case expressionAttributeValues = "ExpressionAttributeValues"
+        case projectionExpression = "ProjectionExpression"
     }
 }
 

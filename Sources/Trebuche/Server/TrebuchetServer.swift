@@ -491,7 +491,45 @@ private actor StreamingHandlerRegistry {
 
 // MARK: - Server Stream Buffer
 
-/// Buffer for outgoing stream data to support resumption
+/// Buffer for outgoing stream data to support resumption after connection loss.
+///
+/// When clients disconnect and reconnect, this buffer allows them to resume streams
+/// without missing updates. The buffer operates as a sliding window, keeping only
+/// the most recent updates.
+///
+/// ## Buffer Sizing
+///
+/// The default buffer size of **100 items** is chosen to balance memory usage
+/// with practical reconnection scenarios:
+///
+/// - **Memory**: ~10KB per buffer (assuming 100 bytes per item average)
+/// - **Time coverage**: ~10 seconds at 10 updates/sec, ~100 seconds at 1 update/sec
+/// - **Typical use**: Handles brief disconnections (network blips, app backgrounding)
+///
+/// ## Tuning Guidelines
+///
+/// Adjust `maxBufferSize` based on your update frequency and expected disconnection duration:
+///
+/// | Update Rate | Disconnection | Buffer Size | Memory |
+/// |-------------|---------------|-------------|--------|
+/// | 1/sec | 1 minute | 60 | ~6KB |
+/// | 10/sec | 10 seconds | 100 (default) | ~10KB |
+/// | 100/sec | 1 second | 100 | ~10KB |
+/// | 1/sec | 10 minutes | 600 | ~60KB |
+///
+/// - **Low-frequency updates**: Increase buffer size for longer coverage
+/// - **High-frequency updates**: Keep default or lower if reconnections are quick
+/// - **Mobile apps**: Consider 200-300 for backgrounding scenarios
+/// - **Memory-constrained**: Reduce to 50 for minimal footprint
+///
+/// ## TTL (Time-to-Live)
+///
+/// The default TTL of **300 seconds (5 minutes)** determines how long buffers persist
+/// after the last activity. After TTL expires, reconnecting clients receive a fresh
+/// stream start instead of buffered data.
+///
+/// - Short TTL (60s): Fast cleanup, less memory, requires quick reconnection
+/// - Long TTL (600s): Better reconnection window, more memory held
 private actor ServerStreamBuffer {
     private struct BufferedStream {
         var recentData: [(sequence: UInt64, data: Data)] = []
@@ -502,6 +540,11 @@ private actor ServerStreamBuffer {
     private let maxBufferSize: Int
     private let ttl: TimeInterval
 
+    /// Initialize stream buffer
+    ///
+    /// - Parameters:
+    ///   - maxBufferSize: Maximum items to buffer per stream (default: 100)
+    ///   - ttl: Time-to-live for buffers in seconds (default: 300 = 5 minutes)
     init(maxBufferSize: Int = 100, ttl: TimeInterval = 300) {
         self.maxBufferSize = maxBufferSize
         self.ttl = ttl

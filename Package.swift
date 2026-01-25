@@ -23,6 +23,14 @@ let package = Package(
             name: "TrebuchePostgreSQL",
             targets: ["TrebuchePostgreSQL"]
         ),
+        .library(
+            name: "TrebucheObservability",
+            targets: ["TrebucheObservability"]
+        ),
+        .library(
+            name: "TrebucheSecurity",
+            targets: ["TrebucheSecurity"]
+        ),
         .executable(
             name: "trebuche",
             targets: ["TrebucheCLI"]
@@ -66,6 +74,8 @@ let package = Package(
             name: "TrebucheCloud",
             dependencies: [
                 "Trebuche",
+                "TrebucheObservability",
+                "TrebucheSecurity",
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
@@ -85,6 +95,19 @@ let package = Package(
                 "Trebuche",
                 "TrebucheCloud",
                 .product(name: "PostgresNIO", package: "postgres-nio"),
+            ]
+        ),
+        .target(
+            name: "TrebucheObservability",
+            dependencies: [
+                "Trebuche",
+            ]
+        ),
+        .target(
+            name: "TrebucheSecurity",
+            dependencies: [
+                "Trebuche",
+                "TrebucheObservability",
             ]
         ),
         .executableTarget(
@@ -120,6 +143,14 @@ let package = Package(
         .testTarget(
             name: "TrebucheCLITests",
             dependencies: ["TrebucheCLI"]
+        ),
+        .testTarget(
+            name: "TrebucheObservabilityTests",
+            dependencies: ["TrebucheObservability"]
+        ),
+        .testTarget(
+            name: "TrebucheSecurityTests",
+            dependencies: ["TrebucheSecurity"]
         ),
     ]
 )
