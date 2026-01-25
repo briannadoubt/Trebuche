@@ -154,7 +154,12 @@ public actor TrebucheLogger {
 ///
 /// Note: stderr is accessed using nonisolated(unsafe) because writes to stderr
 /// are thread-safe at the OS level, despite being exposed as mutable state.
+/// On Linux, stderr is typed as optional, so we unwrap it (it's never nil in practice).
 public let defaultOutput: @Sendable (String) -> Void = { message in
+    #if os(Linux)
+    nonisolated(unsafe) let fileHandle = stderr!
+    #else
     nonisolated(unsafe) let fileHandle = stderr
+    #endif
     fputs(message + "\n", fileHandle)
 }
