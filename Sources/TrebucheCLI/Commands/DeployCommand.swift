@@ -97,6 +97,96 @@ struct DeployCommand: AsyncParsableCommand {
             return
         }
 
+        // Route to provider-specific deployment
+        terminal.print("")
+        switch resolvedProvider.lowercased() {
+        case "fly", "fly.io":
+            try await deployToFly(
+                config: resolvedConfig,
+                actors: actors,
+                projectPath: cwd,
+                region: resolvedRegion,
+                verbose: verbose,
+                terminal: terminal
+            )
+        case "aws":
+            try await deployToAWS(
+                config: resolvedConfig,
+                actors: actors,
+                projectPath: cwd,
+                region: resolvedRegion,
+                verbose: verbose,
+                terminal: terminal
+            )
+        default:
+            terminal.print("❌ Unsupported provider: \(resolvedProvider)", style: .error)
+            terminal.print("   Supported providers: aws, fly", style: .dim)
+            throw ExitCode.failure
+        }
+    }
+
+    // MARK: - Fly.io Deployment
+
+    private func deployToFly(
+        config: ResolvedConfig,
+        actors: [ActorMetadata],
+        projectPath: String,
+        region: String,
+        verbose: Bool,
+        terminal: Terminal
+    ) async throws {
+        let deployer = FlyDeployer(terminal: terminal)
+
+        let result = try await deployer.deploy(
+            config: config,
+            actors: actors,
+            projectPath: projectPath,
+            appName: nil,  // Uses config.projectName
+            region: region,
+            verbose: verbose
+        )
+
+        terminal.print("")
+        terminal.print("🚀 Deployment successful!", style: .header)
+        terminal.print("")
+        terminal.print("  App:      \(result.appName)", style: .success)
+        terminal.print("  URL:      https://\(result.hostname)", style: .success)
+        terminal.print("  Region:   \(result.region)", style: .success)
+        terminal.print("  Status:   \(result.status)", style: .success)
+
+        if let dbUrl = result.databaseUrl {
+            terminal.print("  Database: \(dbUrl)", style: .success)
+        }
+
+        terminal.print("")
+        terminal.print("Ready! Connect with:", style: .header)
+        terminal.print("  wss://\(result.hostname)", style: .dim)
+        terminal.print("")
+
+        // Save deployment info
+        let deploymentInfo = FlyDeploymentInfo(
+            projectName: config.projectName,
+            provider: "fly",
+            appName: result.appName,
+            hostname: result.hostname,
+            region: result.region,
+            databaseUrl: result.databaseUrl,
+            deployedAt: Date()
+        )
+
+        try saveFlyDeploymentInfo(deploymentInfo, to: "\(projectPath)/.trebuche/deployment.json")
+    }
+
+    // MARK: - AWS Deployment
+
+    private func deployToAWS(
+        config: ResolvedConfig,
+        actors: [ActorMetadata],
+        projectPath: String,
+        region: String,
+        verbose: Bool,
+        terminal: Terminal
+    ) async throws {
         // Build
         terminal.print("Building for Lambda (arm64)...", style: .header)
 
@@ -170,9 +260,20 @@ struct DeployCommand: AsyncParsableCommand {
         try FileManager.default.createDirectory(atPath: dirPath, withIntermediateDirectories: true)
         try data.write(to: URL(fileURLWithPath: path))
     }
+
+    private func saveFlyDeploymentInfo(_ info: FlyDeploymentInfo, to path: String) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(info)
+
+        let dirPath = (path as NSString).deletingLastPathComponent
+        try FileManager.default.createDirectory(atPath: dirPath, withIntermediateDirectories: true)
+        try data.write(to: URL(fileURLWithPath: path))
+    }
 }
 
-/// Information about a deployment
+/// Information about an AWS deployment
 struct DeploymentInfo: Codable {
     let projectName: String
     let provider: String
@@ -181,6 +282,17 @@ struct DeploymentInfo: Codable {
     let apiGatewayUrl: String?
     let dynamoDBTable: String
     let cloudMapNamespace: String
+    let deployedAt: Date
+}
+
+/// Information about a Fly.io deployment
+struct FlyDeploymentInfo: Codable {
+    let projectName: String
+    let provider: String
+    let appName: String
+    let hostname: String
+    let region: String
+    let databaseUrl: String?
     let deployedAt: Date
 }
 
