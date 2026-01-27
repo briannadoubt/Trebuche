@@ -107,7 +107,7 @@ let validationMiddleware = ValidationMiddleware(validator: validator)
 
 // Configure gateway with full security
 let gateway = CloudGateway(configuration: .init(
-    middleware: [
+    middlewares: [
         validationMiddleware,   // Validate first
         authMiddleware,         // Authenticate
         authzMiddleware,        // Authorize
@@ -158,7 +158,7 @@ TrebuchetSecurity is designed to integrate seamlessly with CloudGateway through 
 
 ```swift
 // Middleware executes in order:
-let middleware: [CloudMiddleware] = [
+let middlewares: [CloudMiddleware] = [
     ValidationMiddleware(validator: validator),     // 1. Validate request
     AuthenticationMiddleware(provider: apiAuth),    // 2. Authenticate
     AuthorizationMiddleware(policy: policy),        // 3. Authorize
@@ -209,7 +209,7 @@ let devValidator = RequestValidator(configuration: .init(
 
 // Configure gateway for development
 let devGateway = CloudGateway(configuration: .init(
-    middleware: [
+    middlewares: [
         ValidationMiddleware(validator: devValidator),
         AuthenticationMiddleware(provider: devAuth),
         AuthorizationMiddleware(policy: devPolicy),
@@ -252,7 +252,7 @@ let prodValidator = RequestValidator(configuration: .strict)
 
 // Configure gateway for production
 let prodGateway = CloudGateway(configuration: .init(
-    middleware: [
+    middlewares: [
         ValidationMiddleware(validator: prodValidator),
         AuthenticationMiddleware(provider: prodAuth),
         AuthorizationMiddleware(policy: prodPolicy),
@@ -288,7 +288,7 @@ let customValidator = MyValidator()
 
 // Configure gateway with custom components
 let customGateway = CloudGateway(configuration: .init(
-    middleware: [
+    middlewares: [
         ValidationMiddleware(validator: customValidator),
         AuthenticationMiddleware(provider: customAuth),
         AuthorizationMiddleware(policy: customPolicy),

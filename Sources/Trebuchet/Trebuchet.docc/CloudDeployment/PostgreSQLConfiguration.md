@@ -169,13 +169,6 @@ let stateStore = try await PostgreSQLStateStore(
 )
 ```
 
-### Connection String (Recommended)
-
-```swift
-// Using connection string
-let connectionString = "postgresql://user:password@localhost:5432/trebuchet"
-let stateStore = try await PostgreSQLStateStore(connectionString: connectionString)
-```
 
 ## Stateful Actors
 
@@ -279,12 +272,18 @@ import TrebuchetPostgreSQL
 
 // Initialize PostgreSQL state store
 let stateStore = try await PostgreSQLStateStore(
-    connectionString: "postgresql://localhost/trebuchet"
+    host: "localhost",
+    database: "trebuchet",
+    username: "postgres",
+    password: "password"
 )
 
 // Initialize stream adapter for multi-instance sync
 let streamAdapter = try await PostgreSQLStreamAdapter(
-    connectionString: "postgresql://localhost/trebuchet"
+    host: "localhost",
+    database: "trebuchet",
+    username: "postgres",
+    password: "password"
 )
 
 // Configure gateway

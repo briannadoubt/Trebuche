@@ -328,7 +328,7 @@ let authMiddleware = AuthenticationMiddleware(provider: apiAuth)
 
 // Configure gateway with middleware
 let gateway = CloudGateway(configuration: .init(
-    middleware: [authMiddleware],
+    middlewares: [authMiddleware],
     stateStore: stateStore,
     registry: registry
 ))

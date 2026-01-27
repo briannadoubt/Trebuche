@@ -87,7 +87,7 @@ let tracer = TrebuchetTracer()
 
 // Inject into CloudGateway
 let gateway = CloudGateway(configuration: .init(
-    middleware: [
+    middlewares: [
         TracingMiddleware(tracer: tracer)
     ],
     logger: logger,
@@ -193,7 +193,7 @@ let tracingMiddleware = TracingMiddleware(tracer: tracer)
 
 // Configure gateway
 let gateway = CloudGateway(configuration: .init(
-    middleware: [tracingMiddleware],
+    middlewares: [tracingMiddleware],
     logger: logger,
     metrics: metrics,
     stateStore: stateStore,

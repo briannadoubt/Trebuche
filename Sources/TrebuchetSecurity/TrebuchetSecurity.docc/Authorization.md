@@ -425,7 +425,7 @@ let authzMiddleware = AuthorizationMiddleware(policy: policy)
 
 // Configure gateway
 let gateway = CloudGateway(configuration: .init(
-    middleware: [
+    middlewares: [
         authMiddleware,   // Authenticate first
         authzMiddleware   // Then authorize
     ],
