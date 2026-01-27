@@ -1,0 +1,44 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Trebuchet}",
+            "name": "Debug trebuchet",
+            "target": "trebuchet",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug trebuchet"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Trebuchet}",
+            "name": "Release trebuchet",
+            "target": "trebuchet",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release trebuchet"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Trebuchet}",
+            "name": "Debug trebuchet",
+            "target": "trebuchet",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug trebuchet"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Trebuchet}",
+            "name": "Release trebuchet",
+            "target": "trebuchet",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release trebuchet"
+        }
+    ]
+}
