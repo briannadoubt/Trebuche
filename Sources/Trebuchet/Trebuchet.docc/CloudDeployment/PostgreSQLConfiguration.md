@@ -339,18 +339,21 @@ let stateStore = try await PostgreSQLStateStore(
 
 ```swift
 import PostgresNIO
+import TrebuchetPostgreSQL
 
-// Configure TLS
-let configuration = PostgresConnection.Configuration(
+// For TLS connections, you'll need to configure at the NIO level
+// The PostgreSQLStateStore uses NIO's TLS configuration internally
+
+let stateStore = try await PostgreSQLStateStore(
     host: "production.postgres.example.com",
     port: 5432,
-    username: "app",
-    password: "secure-password",
     database: "trebuchet",
-    tls: .require(try .init(configuration: .clientDefault))
+    username: "app",
+    password: "secure-password"
 )
 
-let stateStore = try await PostgreSQLStateStore(configuration: configuration)
+// TLS is enabled by default for remote connections
+// Use host: "localhost" to disable TLS for local development
 ```
 
 ## Deployment Configurations
