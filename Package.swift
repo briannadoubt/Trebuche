@@ -111,6 +111,8 @@ let package = Package(
             dependencies: [
                 "Trebuchet",
                 "TrebuchetObservability",
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "_CryptoExtras", package: "swift-crypto"),
             ]
         ),
         .executableTarget(
@@ -153,7 +155,11 @@ let package = Package(
         ),
         .testTarget(
             name: "TrebuchetSecurityTests",
-            dependencies: ["TrebuchetSecurity"]
+            dependencies: [
+                "TrebuchetSecurity",
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "_CryptoExtras", package: "swift-crypto"),
+            ]
         ),
     ]
 )
