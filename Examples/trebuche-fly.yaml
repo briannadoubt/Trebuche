@@ -1,8 +1,8 @@
-# trebuche.yaml - Fly.io Deployment Example
+# trebuchet.yaml - Fly.io Deployment Example
 #
-# Deploy with: trebuche deploy --provider fly
+# Deploy with: trebuchet deploy --provider fly
 
-name: trebuche-demo
+name: trebuchet-demo
 version: "1"
 
 defaults:
