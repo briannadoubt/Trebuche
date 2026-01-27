@@ -123,6 +123,49 @@ Sources/TrebuchetCLI/
 │   └── TerraformGenerator.swift    # AWS Terraform configuration generation
 └── Utilities/
     └── Terminal.swift              # Terminal output styling
+
+Sources/TrebuchetSecurity/
+├── TrebuchetSecurity.swift          # Module exports and documentation
+├── Authentication/
+│   ├── AuthenticationProvider.swift # Authentication protocol
+│   ├── APIKeyAuthenticator.swift   # API key authentication
+│   ├── JWTAuthenticator.swift      # JWT authentication (dev/test only)
+│   └── Credentials.swift           # Credentials types, Principal
+├── Authorization/
+│   ├── AuthorizationPolicy.swift   # Authorization protocol
+│   └── RoleBasedPolicy.swift       # RBAC implementation
+├── RateLimiting/
+│   ├── RateLimiter.swift           # Rate limiter protocol
+│   ├── TokenBucketLimiter.swift    # Token bucket algorithm
+│   └── SlidingWindowLimiter.swift  # Sliding window algorithm
+└── Validation/
+    └── RequestValidator.swift      # Request validation
+
+Sources/TrebuchetObservability/
+├── TrebuchetObservability.swift     # Module exports and documentation
+├── Logging/
+│   ├── TrebuchetLogger.swift       # Structured logger
+│   ├── LogLevel.swift              # Log levels
+│   ├── LogFormatter.swift          # Formatter protocol
+│   ├── LogContext.swift            # Log context
+│   └── Formatters/
+│       ├── ConsoleFormatter.swift  # Console output formatter
+│       └── JSONFormatter.swift     # JSON output formatter
+├── Metrics/
+│   ├── MetricsCollector.swift      # Metrics collector protocol
+│   ├── InMemoryCollector.swift     # In-memory collector
+│   ├── CloudWatchReporter.swift    # AWS CloudWatch reporter
+│   ├── Counter.swift               # Counter metric
+│   └── Histogram.swift             # Histogram metric
+└── Tracing/
+    ├── TraceContext.swift          # Trace context (re-export from Trebuchet)
+    ├── Span.swift                  # Span types
+    └── SpanExporter.swift          # Span exporter protocol
+
+Sources/TrebuchetPostgreSQL/
+├── TrebuchetPostgreSQL.swift        # Module exports and documentation
+├── PostgreSQLStateStore.swift      # ActorStateStore using PostgreSQL
+└── PostgreSQLStreamAdapter.swift   # LISTEN/NOTIFY for multi-instance sync
 ```
 
 ### Key Types
@@ -323,6 +366,8 @@ let players = try await lobby.getPlayers()  // Invokes another Lambda
 - **swift-syntax**: Macro implementation and actor discovery
 - **swift-argument-parser**: CLI argument parsing
 - **Yams**: YAML configuration parsing
+- **postgres-nio**: PostgreSQL client (TrebuchetPostgreSQL)
+- **swift-crypto**: Cryptographic operations (TrebuchetSecurity, TrebuchetAWS)
 
 ### Tests
 
@@ -333,3 +378,6 @@ Test suites:
 - `TrebuchetCloudTests`: Cloud gateway, providers, state stores, registries
 - `TrebuchetAWSTests`: AWS-specific implementations
 - `TrebuchetCLITests`: CLI configuration, discovery, build system
+- `TrebuchetSecurityTests`: Authentication, authorization, rate limiting, validation
+- `TrebuchetObservabilityTests`: Logging, metrics, distributed tracing
+- `TrebuchetPostgreSQLTests`: PostgreSQL state store and stream adapter
