@@ -133,11 +133,36 @@ struct DevCommand: AsyncParsableCommand {
         }
     }
 
+    private func sanitizeSwiftIdentifier(_ name: String) -> String {
+        var result = name
+
+        // Replace invalid characters with underscores
+        let invalidChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted
+        result = result.components(separatedBy: invalidChars).joined(separator: "_")
+
+        // Remove consecutive underscores
+        while result.contains("__") {
+            result = result.replacingOccurrences(of: "__", with: "_")
+        }
+
+        // Ensure it starts with letter or underscore (not a number)
+        if let first = result.first, first.isNumber {
+            result = "_" + result
+        }
+
+        // If empty after sanitization, use fallback
+        if result.isEmpty {
+            result = "Project"
+        }
+
+        return result
+    }
+
     private func getProjectName(from directory: String, terminal: Terminal) throws -> String {
         // Try to load from trebuchet.yaml first
         let configLoader = ConfigLoader()
         if let config = try? configLoader.load(from: directory) {
-            return config.name
+            return sanitizeSwiftIdentifier(config.name)
         }
 
         // Otherwise, try to parse Package.swift
@@ -150,14 +175,15 @@ struct DevCommand: AsyncParsableCommand {
                 if let nameRange = match.range(of: #""([^"]+)""#, options: .regularExpression) {
                     let nameMatch = String(match[nameRange])
                     let name = nameMatch.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-                    return name
+                    return sanitizeSwiftIdentifier(name)
                 }
             }
         }
 
         // Fallback to directory name
         terminal.print("Could not determine project name, using directory name", style: .warning)
-        return URL(fileURLWithPath: directory).lastPathComponent
+        let dirName = URL(fileURLWithPath: directory).lastPathComponent
+        return sanitizeSwiftIdentifier(dirName)
     }
 
     private func generatePackageManifest(projectName: String, parentPackageName: String) -> String {
@@ -218,12 +244,14 @@ struct DevCommand: AsyncParsableCommand {
                 let moduleName = components[sourcesIndex + 1]
                 // Skip test and example targets
                 if !moduleName.contains("Test") && !moduleName.contains("Example") {
-                    return moduleName
+                    // Sanitize in case of unusual target names
+                    return sanitizeSwiftIdentifier(moduleName)
                 }
             }
         }
 
         // Fall back to project name if we can't infer
+        // projectName is already sanitized
         return projectName
     }
 
