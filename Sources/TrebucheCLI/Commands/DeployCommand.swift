@@ -192,8 +192,8 @@ struct DeployCommand: AsyncParsableCommand {
 
         let builder = DockerBuilder()
         let buildResult = try await builder.build(
-            projectPath: cwd,
-            config: resolvedConfig,
+            projectPath: projectPath,
+            config: config,
             verbose: verbose,
             terminal: terminal
         )
@@ -206,9 +206,9 @@ struct DeployCommand: AsyncParsableCommand {
 
         let terraformGenerator = TerraformGenerator()
         let terraformDir = try terraformGenerator.generate(
-            config: resolvedConfig,
+            config: config,
             actors: actors,
-            outputDir: "\(cwd)/.trebuche/terraform"
+            outputDir: "\(projectPath)/.trebuche/terraform"
         )
 
         terminal.print("  ✓ Terraform generated at \(terraformDir)", style: .success)
@@ -220,7 +220,7 @@ struct DeployCommand: AsyncParsableCommand {
         let deployer = TerraformDeployer()
         let deployment = try await deployer.deploy(
             terraformDir: terraformDir,
-            region: resolvedRegion,
+            region: region,
             verbose: verbose,
             terminal: terminal
         )
@@ -237,9 +237,9 @@ struct DeployCommand: AsyncParsableCommand {
 
         // Save deployment info
         let deploymentInfo = DeploymentInfo(
-            projectName: resolvedConfig.projectName,
-            provider: resolvedProvider,
-            region: resolvedRegion,
+            projectName: config.projectName,
+            provider: "aws",
+            region: region,
             lambdaArn: deployment.lambdaArn,
             apiGatewayUrl: deployment.apiGatewayUrl,
             dynamoDBTable: deployment.dynamoDBTable,
@@ -247,7 +247,7 @@ struct DeployCommand: AsyncParsableCommand {
             deployedAt: Date()
         )
 
-        try saveDeploymentInfo(deploymentInfo, to: "\(cwd)/.trebuche/deployment.json")
+        try saveDeploymentInfo(deploymentInfo, to: "\(projectPath)/.trebuche/deployment.json")
     }
 
     private func saveDeploymentInfo(_ info: DeploymentInfo, to path: String) throws {

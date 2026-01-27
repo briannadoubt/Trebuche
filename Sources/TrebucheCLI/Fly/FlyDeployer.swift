@@ -63,7 +63,7 @@ struct FlyDeployer {
 
         // Set up PostgreSQL if needed
         var databaseUrl: String?
-        if config.stateStore == .postgresql {
+        if config.stateType == "postgresql" || config.stateType == "postgres" {
             terminal.print("Setting up PostgreSQL...", style: .header)
             databaseUrl = try await setupPostgreSQL(appName: resolvedAppName, verbose: verbose)
             terminal.print("  ✓ PostgreSQL configured", style: .success)
@@ -279,7 +279,7 @@ struct FlyDeployer {
         [[vm]]
           cpu_kind = "shared"
           cpus = 1
-          memory_mb = \(config.defaultMemory ?? 512)
+          memory_mb = \(config.actors.map(\.memory).max() ?? 512)
 
         """
 
