@@ -3,6 +3,7 @@
 
 import Foundation
 import Crypto
+import _CryptoExtras
 
 /// JWT authenticator with full cryptographic signature validation
 ///
@@ -11,15 +12,11 @@ import Crypto
 ///
 /// # Supported Algorithms
 /// - **HS256**: HMAC with SHA-256 (symmetric key)
+/// - **RS256**: RSA PKCS#1 v1.5 with SHA-256 (asymmetric key)
 /// - **ES256**: ECDSA with P-256 curve and SHA-256 (asymmetric key)
 ///
-/// # Unsupported Algorithms
-/// - **RS256/RS384/RS512**: RSA signatures are not supported by swift-crypto.
-///   For RS256 support, consider using [JWTKit](https://github.com/vapor/jwt-kit)
-///   or [Swift-JWT](https://github.com/Kitura/Swift-JWT)
-///
 /// # Security Features
-/// - ✅ Cryptographic signature validation (HS256, ES256)
+/// - ✅ Cryptographic signature validation (HS256, RS256, ES256)
 /// - ✅ Issuer (`iss`) claim validation
 /// - ✅ Audience (`aud`) claim validation
 /// - ✅ Expiration (`exp`) claim validation with clock skew tolerance
@@ -33,28 +30,52 @@ import Crypto
 /// let authenticator = JWTAuthenticator(configuration: .init(
 ///     issuer: "https://auth.example.com",
 ///     audience: "my-app",
-///     signingKey: .symmetric(secret: "your-256-bit-secret")
+///     signingKey: .hs256(secret: "your-256-bit-secret")
 /// ))
 ///
-/// // ES256 with public key
-/// let publicKey = try P256.Signing.PublicKey(pemRepresentation: pemString)
+/// // RS256 with RSA public key
+/// let rsaKey = try _RSA.Signing.PublicKey(pemRepresentation: pemString)
 /// let authenticator = JWTAuthenticator(configuration: .init(
 ///     issuer: "https://auth.example.com",
-///     signingKey: .asymmetric(publicKey: publicKey)
+///     signingKey: .rs256(publicKey: rsaKey)
+/// ))
+///
+/// // ES256 with P-256 public key
+/// let ecKey = try P256.Signing.PublicKey(pemRepresentation: pemString)
+/// let authenticator = JWTAuthenticator(configuration: .init(
+///     issuer: "https://auth.example.com",
+///     signingKey: .es256(publicKey: ecKey)
 /// ))
 /// ```
 public struct JWTAuthenticator: AuthenticationProvider {
     /// Signing key types for JWT validation
     public enum SigningKey: Sendable {
-        /// Symmetric key for HS256
-        case symmetric(secret: String)
+        /// Symmetric key for HS256 (HMAC-SHA256)
+        case hs256(secret: String)
 
-        /// Asymmetric public key for ES256
-        case asymmetric(publicKey: P256.Signing.PublicKey)
+        /// RSA public key for RS256 (RSA PKCS#1 v1.5 with SHA-256)
+        case rs256(publicKey: _RSA.Signing.PublicKey)
+
+        /// P-256 public key for ES256 (ECDSA with SHA-256)
+        case es256(publicKey: P256.Signing.PublicKey)
 
         /// No signature validation (for testing only)
         /// - Warning: Never use this in production!
         case none
+
+        // MARK: - Deprecated compatibility aliases
+
+        /// Deprecated: Use `.hs256(secret:)` instead
+        @available(*, deprecated, renamed: "hs256(secret:)")
+        public static func symmetric(secret: String) -> SigningKey {
+            .hs256(secret: secret)
+        }
+
+        /// Deprecated: Use `.es256(publicKey:)` instead
+        @available(*, deprecated, renamed: "es256(publicKey:)")
+        public static func asymmetric(publicKey: P256.Signing.PublicKey) -> SigningKey {
+            .es256(publicKey: publicKey)
+        }
     }
 
     /// JWT configuration
@@ -122,7 +143,7 @@ public struct JWTAuthenticator: AuthenticationProvider {
             print("""
             ⚠️  WARNING: JWTAuthenticator configured without signature validation!
             This is acceptable for testing but should NEVER be used in production.
-            Configure a signing key using .symmetric() or .asymmetric() for production use.
+            Configure a signing key using .hs256(), .rs256(), or .es256() for production use.
             """)
         }
         #endif
@@ -201,18 +222,26 @@ public struct JWTAuthenticator: AuthenticationProvider {
             // No validation - testing only
             return
 
-        case .symmetric(let secret):
+        case .hs256(let secret):
             guard algorithm == .hs256 else {
                 throw AuthenticationError.malformed(
-                    reason: "Algorithm mismatch: token uses \(algorithm.rawValue) but symmetric key configured (expects HS256)"
+                    reason: "Algorithm mismatch: token uses \(algorithm.rawValue) but HS256 key configured"
                 )
             }
             try validateHS256Signature(token: token, secret: secret)
 
-        case .asymmetric(let publicKey):
+        case .rs256(let publicKey):
+            guard algorithm == .rs256 else {
+                throw AuthenticationError.malformed(
+                    reason: "Algorithm mismatch: token uses \(algorithm.rawValue) but RS256 key configured"
+                )
+            }
+            try validateRS256Signature(token: token, publicKey: publicKey)
+
+        case .es256(let publicKey):
             guard algorithm == .es256 else {
                 throw AuthenticationError.malformed(
-                    reason: "Algorithm mismatch: token uses \(algorithm.rawValue) but ES256 public key configured"
+                    reason: "Algorithm mismatch: token uses \(algorithm.rawValue) but ES256 key configured"
                 )
             }
             try validateES256Signature(token: token, publicKey: publicKey)
@@ -240,6 +269,31 @@ public struct JWTAuthenticator: AuthenticationProvider {
 
         // Constant-time comparison to prevent timing attacks
         guard constantTimeCompare(providedSignature, expectedSignature) else {
+            throw AuthenticationError.invalidCredentials
+        }
+    }
+
+    private func validateRS256Signature(token: String, publicKey: _RSA.Signing.PublicKey) throws {
+        let parts = token.split(separator: ".")
+        guard parts.count == 3 else {
+            throw AuthenticationError.malformed(reason: "Invalid JWT format")
+        }
+
+        let signedPart = "\(parts[0]).\(parts[1])"
+        let signatureB64 = String(parts[2])
+
+        guard let signedData = signedPart.data(using: .utf8) else {
+            throw AuthenticationError.malformed(reason: "Invalid encoding")
+        }
+
+        // Decode the signature
+        let signatureData = try base64URLDecode(signatureB64)
+
+        // Create signature from raw representation
+        let signature = _RSA.Signing.RSASignature(rawRepresentation: signatureData)
+
+        // Verify the signature using PKCS#1 v1.5 padding (required for RS256)
+        guard publicKey.isValidSignature(signature, for: SHA256.hash(data: signedData), padding: .insecurePKCS1v1_5) else {
             throw AuthenticationError.invalidCredentials
         }
     }
@@ -372,8 +426,8 @@ struct JWTHeader: Codable {
 /// Supported JWT algorithms
 enum JWTAlgorithm: String {
     case hs256 = "HS256"
+    case rs256 = "RS256"
     case es256 = "ES256"
-    case rs256 = "RS256"  // Not supported but recognized
     case unknown
 }
 
@@ -516,7 +570,14 @@ actor JTICache {
 public enum JWTHelper {
     /// Creates an HS256-signed JWT
     /// - Parameters:
-    ///   - payload: JWT payload dictionary
+    ///   - subject: Subject claim (sub)
+    ///   - issuer: Issuer claim (iss)
+    ///   - audience: Audience claim (aud)
+    ///   - expiresIn: Time until expiration in seconds
+    ///   - notBefore: Not before date (nbf)
+    ///   - jwtID: JWT ID for replay protection (jti)
+    ///   - roles: User roles
+    ///   - customClaims: Additional custom claims
     ///   - secret: HMAC secret
     /// - Returns: Signed JWT string
     public static func createHS256Token(
@@ -562,7 +623,6 @@ public enum JWTHelper {
         }
 
         let payloadData = try! JSONSerialization.data(withJSONObject: payloadDict)
-        let payload = String(data: payloadData, encoding: .utf8)!
 
         // Encode parts
         let headerB64 = base64URLEncode(header.data(using: .utf8)!)
@@ -577,10 +637,85 @@ public enum JWTHelper {
         return "\(signedPart).\(signatureB64)"
     }
 
+    /// Creates an RS256-signed JWT
+    /// - Parameters:
+    ///   - subject: Subject claim (sub)
+    ///   - issuer: Issuer claim (iss)
+    ///   - audience: Audience claim (aud)
+    ///   - expiresIn: Time until expiration in seconds
+    ///   - notBefore: Not before date (nbf)
+    ///   - jwtID: JWT ID for replay protection (jti)
+    ///   - roles: User roles
+    ///   - customClaims: Additional custom claims
+    ///   - privateKey: RSA private key for signing
+    /// - Returns: Signed JWT string
+    public static func createRS256Token(
+        subject: String,
+        issuer: String,
+        audience: String? = nil,
+        expiresIn: TimeInterval = 3600,
+        notBefore: Date? = nil,
+        jwtID: String? = nil,
+        roles: [String]? = nil,
+        customClaims: [String: String]? = nil,
+        privateKey: _RSA.Signing.PrivateKey
+    ) throws -> String {
+        let now = Date()
+
+        // Build header
+        let header = #"{"alg":"RS256","typ":"JWT"}"#
+
+        // Build payload
+        var payloadDict: [String: Any] = [
+            "sub": subject,
+            "iss": issuer,
+            "exp": now.addingTimeInterval(expiresIn).timeIntervalSince1970,
+            "iat": now.timeIntervalSince1970
+        ]
+
+        if let audience = audience {
+            payloadDict["aud"] = audience
+        }
+        if let nbf = notBefore {
+            payloadDict["nbf"] = nbf.timeIntervalSince1970
+        }
+        if let jti = jwtID {
+            payloadDict["jti"] = jti
+        }
+        if let roles = roles {
+            payloadDict["roles"] = roles
+        }
+        if let custom = customClaims {
+            for (key, value) in custom {
+                payloadDict[key] = value
+            }
+        }
+
+        let payloadData = try JSONSerialization.data(withJSONObject: payloadDict)
+
+        // Encode parts
+        let headerB64 = base64URLEncode(header.data(using: .utf8)!)
+        let payloadB64 = base64URLEncode(payloadData)
+
+        // Sign using PKCS#1 v1.5 (required for RS256)
+        let signedPart = "\(headerB64).\(payloadB64)"
+        let signature = try privateKey.signature(for: SHA256.hash(data: signedPart.data(using: .utf8)!), padding: .insecurePKCS1v1_5)
+        let signatureB64 = base64URLEncode(signature.rawRepresentation)
+
+        return "\(signedPart).\(signatureB64)"
+    }
+
     /// Creates an ES256-signed JWT
     /// - Parameters:
-    ///   - privateKey: P-256 signing private key
-    ///   - Other parameters same as HS256
+    ///   - subject: Subject claim (sub)
+    ///   - issuer: Issuer claim (iss)
+    ///   - audience: Audience claim (aud)
+    ///   - expiresIn: Time until expiration in seconds
+    ///   - notBefore: Not before date (nbf)
+    ///   - jwtID: JWT ID for replay protection (jti)
+    ///   - roles: User roles
+    ///   - customClaims: Additional custom claims
+    ///   - privateKey: P-256 private key for signing
     /// - Returns: Signed JWT string
     public static func createES256Token(
         subject: String,

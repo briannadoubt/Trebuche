@@ -2,27 +2,35 @@
 // Production-grade security for Trebuchet distributed actors
 //
 // This module provides comprehensive security features including:
-// - Authentication (JWT with HS256/ES256 signature validation, API keys)
+// - Authentication (JWT with HS256/RS256/ES256 signature validation, API keys)
 // - Authorization (RBAC)
 // - Rate limiting (token bucket, sliding window)
 // - Request validation
 //
 // Example usage:
 // ```swift
-// // HS256 JWT authentication
+// // HS256 JWT authentication (symmetric secret)
 // let auth = JWTAuthenticator(configuration: .init(
 //     issuer: "https://auth.example.com",
 //     audience: "my-app",
-//     signingKey: .symmetric(secret: "your-256-bit-secret")
+//     signingKey: .hs256(secret: "your-256-bit-secret")
 // ))
 // let principal = try await auth.authenticate(credentials)
 //
-// // ES256 JWT authentication (with P-256 public key)
-// import Crypto
-// let publicKey = try P256.Signing.PublicKey(pemRepresentation: pemString)
+// // RS256 JWT authentication (RSA public key)
+// import _CryptoExtras
+// let rsaKey = try _RSA.Signing.PublicKey(pemRepresentation: pemString)
 // let auth = JWTAuthenticator(configuration: .init(
 //     issuer: "https://auth.example.com",
-//     signingKey: .asymmetric(publicKey: publicKey)
+//     signingKey: .rs256(publicKey: rsaKey)
+// ))
+//
+// // ES256 JWT authentication (P-256 public key)
+// import Crypto
+// let ecKey = try P256.Signing.PublicKey(pemRepresentation: pemString)
+// let auth = JWTAuthenticator(configuration: .init(
+//     issuer: "https://auth.example.com",
+//     signingKey: .es256(publicKey: ecKey)
 // ))
 //
 // // Authorization
@@ -38,23 +46,20 @@
 /// TrebuchetSecurity provides production-grade security for distributed actors.
 ///
 /// This module includes:
-/// - **Authentication**: JWT (HS256, ES256) and API key validation with full signature verification
+/// - **Authentication**: JWT (HS256, RS256, ES256) and API key validation with full signature verification
 /// - **Authorization**: Role-based access control (RBAC)
 /// - **Rate Limiting**: Token bucket and sliding window algorithms
 /// - **Validation**: Request size limits and malformed envelope detection
 ///
 /// ## JWT Features
 /// - HS256 (HMAC-SHA256) signature validation
+/// - RS256 (RSA PKCS#1 v1.5 with SHA-256) signature validation
 /// - ES256 (ECDSA P-256) signature validation
 /// - Issuer, audience, and expiration claim validation
 /// - Not-before (nbf) claim validation
 /// - JWT ID (jti) replay protection
 /// - Configurable clock skew tolerance
-///
-/// ## Note on RS256
-/// RS256 (RSA) signatures are not supported by swift-crypto.
-/// For RS256 support, consider using JWTKit or Swift-JWT.
 public enum TrebuchetSecurity {
     /// Current version of the security module
-    public static let version = "1.2.0"
+    public static let version = "1.3.0"
 }

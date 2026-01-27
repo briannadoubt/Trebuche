@@ -4,6 +4,7 @@
 import Testing
 import Foundation
 import Crypto
+import _CryptoExtras
 @testable import TrebuchetSecurity
 
 @Suite("Authentication Tests")
@@ -184,7 +185,7 @@ struct AuthenticationTests {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
             audience: "my-app",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             enableReplayProtection: false
         ))
 
@@ -208,7 +209,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorHS256InvalidSignature() async {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             enableReplayProtection: false
         ))
 
@@ -239,7 +240,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorHS256WrongIssuer() async {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             enableReplayProtection: false
         ))
 
@@ -265,7 +266,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorHS256ExpiredToken() async {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             clockSkew: 0,
             enableReplayProtection: false
         ))
@@ -293,6 +294,142 @@ struct AuthenticationTests {
         }
     }
 
+    // MARK: - JWT Authenticator Tests (RS256)
+
+    @Test("JWTAuthenticator RS256 valid token")
+    func testJWTAuthenticatorRS256ValidToken() async throws {
+        // Generate RSA key pair (2048 bits is minimum for security)
+        let privateKey = try _RSA.Signing.PrivateKey(keySize: .bits2048)
+        let publicKey = privateKey.publicKey
+
+        let authenticator = JWTAuthenticator(configuration: .init(
+            issuer: "https://auth.example.com",
+            audience: "my-app",
+            signingKey: .rs256(publicKey: publicKey),
+            enableReplayProtection: false
+        ))
+
+        let jwt = try JWTHelper.createRS256Token(
+            subject: "user-789",
+            issuer: "https://auth.example.com",
+            audience: "my-app",
+            roles: ["admin", "moderator"],
+            privateKey: privateKey
+        )
+
+        let credentials = Credentials.bearer(token: jwt)
+        let principal = try await authenticator.authenticate(credentials)
+
+        #expect(principal.id == "user-789")
+        #expect(principal.hasRole("admin"))
+        #expect(principal.hasRole("moderator"))
+    }
+
+    @Test("JWTAuthenticator RS256 invalid signature")
+    func testJWTAuthenticatorRS256InvalidSignature() async throws {
+        let privateKey1 = try _RSA.Signing.PrivateKey(keySize: .bits2048)
+        let privateKey2 = try _RSA.Signing.PrivateKey(keySize: .bits2048) // Different key
+        let publicKey1 = privateKey1.publicKey
+
+        let authenticator = JWTAuthenticator(configuration: .init(
+            issuer: "https://auth.example.com",
+            signingKey: .rs256(publicKey: publicKey1),
+            enableReplayProtection: false
+        ))
+
+        // Sign with privateKey2 but verify with publicKey1
+        let jwt = try JWTHelper.createRS256Token(
+            subject: "user-123",
+            issuer: "https://auth.example.com",
+            privateKey: privateKey2
+        )
+
+        let credentials = Credentials.bearer(token: jwt)
+
+        do {
+            _ = try await authenticator.authenticate(credentials)
+            #expect(Bool(false), "Should have thrown for invalid signature")
+        } catch let error as AuthenticationError {
+            if case .invalidCredentials = error {
+                // Expected
+            } else {
+                #expect(Bool(false), "Expected invalidCredentials error, got \(error)")
+            }
+        } catch {
+            #expect(Bool(false), "Expected AuthenticationError")
+        }
+    }
+
+    @Test("JWTAuthenticator RS256 expired token")
+    func testJWTAuthenticatorRS256ExpiredToken() async throws {
+        let privateKey = try _RSA.Signing.PrivateKey(keySize: .bits2048)
+        let publicKey = privateKey.publicKey
+
+        let authenticator = JWTAuthenticator(configuration: .init(
+            issuer: "https://auth.example.com",
+            signingKey: .rs256(publicKey: publicKey),
+            clockSkew: 0,
+            enableReplayProtection: false
+        ))
+
+        let jwt = try JWTHelper.createRS256Token(
+            subject: "user-123",
+            issuer: "https://auth.example.com",
+            expiresIn: -3600, // Expired 1 hour ago
+            privateKey: privateKey
+        )
+
+        let credentials = Credentials.bearer(token: jwt)
+
+        do {
+            _ = try await authenticator.authenticate(credentials)
+            #expect(Bool(false), "Should have thrown for expired token")
+        } catch let error as AuthenticationError {
+            if case .expired = error {
+                // Expected
+            } else {
+                #expect(Bool(false), "Expected expired error, got \(error)")
+            }
+        } catch {
+            #expect(Bool(false), "Expected AuthenticationError")
+        }
+    }
+
+    @Test("JWTAuthenticator RS256 algorithm mismatch with HS256")
+    func testJWTAuthenticatorRS256AlgorithmMismatchHS256() async throws {
+        let privateKey = try _RSA.Signing.PrivateKey(keySize: .bits2048)
+        let publicKey = privateKey.publicKey
+
+        // Configure for RS256
+        let authenticator = JWTAuthenticator(configuration: .init(
+            issuer: "https://auth.example.com",
+            signingKey: .rs256(publicKey: publicKey),
+            enableReplayProtection: false
+        ))
+
+        // Create HS256 token
+        let jwt = JWTHelper.createHS256Token(
+            subject: "user-123",
+            issuer: "https://auth.example.com",
+            secret: Self.testSecret
+        )
+
+        let credentials = Credentials.bearer(token: jwt)
+
+        do {
+            _ = try await authenticator.authenticate(credentials)
+            #expect(Bool(false), "Should have thrown for algorithm mismatch")
+        } catch let error as AuthenticationError {
+            if case .malformed(let reason) = error {
+                #expect(reason.contains("Algorithm mismatch"))
+            } else {
+                #expect(Bool(false), "Expected malformed error, got \(error)")
+            }
+        } catch {
+            #expect(Bool(false), "Expected AuthenticationError")
+        }
+    }
+
     // MARK: - JWT Authenticator Tests (ES256)
 
     @Test("JWTAuthenticator ES256 valid token")
@@ -303,7 +440,7 @@ struct AuthenticationTests {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
             audience: "my-app",
-            signingKey: .asymmetric(publicKey: publicKey),
+            signingKey: .es256(publicKey: publicKey),
             enableReplayProtection: false
         ))
 
@@ -330,7 +467,7 @@ struct AuthenticationTests {
 
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .asymmetric(publicKey: publicKey1),
+            signingKey: .es256(publicKey: publicKey1),
             enableReplayProtection: false
         ))
 
@@ -363,7 +500,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorNbfNotYetValid() async {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             clockSkew: 0,
             enableReplayProtection: false
         ))
@@ -395,7 +532,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorNbfValidWithClockSkew() async throws {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             clockSkew: 120, // 2 minute tolerance
             enableReplayProtection: false
         ))
@@ -419,7 +556,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorJtiReplayProtection() async throws {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             enableReplayProtection: true
         ))
 
@@ -455,7 +592,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorJtiDisabledAllowsReplay() async throws {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             enableReplayProtection: false
         ))
 
@@ -483,7 +620,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorMaxAge() async {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             clockSkew: 0,
             maxAge: 300, // 5 minutes max age
             enableReplayProtection: false
@@ -534,7 +671,7 @@ struct AuthenticationTests {
         // Configure for HS256
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             enableReplayProtection: false
         ))
 
@@ -568,7 +705,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorMalformedToken() async {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             enableReplayProtection: false
         ))
 
@@ -592,7 +729,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorWrongCredentialType() async {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             enableReplayProtection: false
         ))
 
@@ -648,7 +785,7 @@ struct AuthenticationTests {
     func testJWTAuthenticatorCustomClaims() async throws {
         let authenticator = JWTAuthenticator(configuration: .init(
             issuer: "https://auth.example.com",
-            signingKey: .symmetric(secret: Self.testSecret),
+            signingKey: .hs256(secret: Self.testSecret),
             enableReplayProtection: false
         ))
 
