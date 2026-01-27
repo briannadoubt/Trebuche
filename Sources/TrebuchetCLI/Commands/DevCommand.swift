@@ -39,8 +39,10 @@ struct DevCommand: AsyncParsableCommand {
         }
         terminal.print("")
 
-        // Get project name
+        // Get project and module names
         let projectName = try getProjectName(from: cwd, terminal: terminal)
+        let parentPackageName = try getParentPackageName(from: cwd) ?? projectName
+        let moduleName = inferModuleName(from: actors, projectName: projectName)
 
         // Generate and run local bootstrap
         terminal.print("Building project...", style: .dim)
@@ -76,7 +78,10 @@ struct DevCommand: AsyncParsableCommand {
         )
 
         // Generate Package.swift
-        let packageManifest = generatePackageManifest(projectName: projectName)
+        let packageManifest = generatePackageManifest(
+            projectName: moduleName,
+            parentPackageName: parentPackageName
+        )
         try packageManifest.write(
             toFile: "\(devPath)/Package.swift",
             atomically: true,
@@ -92,7 +97,7 @@ struct DevCommand: AsyncParsableCommand {
 
         let mainScript = generateLocalRunner(
             actors: actors,
-            projectName: projectName,
+            moduleName: moduleName,
             host: host,
             port: port
         )
@@ -155,7 +160,7 @@ struct DevCommand: AsyncParsableCommand {
         return URL(fileURLWithPath: directory).lastPathComponent
     }
 
-    private func generatePackageManifest(projectName: String) -> String {
+    private func generatePackageManifest(projectName: String, parentPackageName: String) -> String {
         """
         // swift-tools-version: 6.0
         // Auto-generated Package.swift for local development server
@@ -167,15 +172,16 @@ struct DevCommand: AsyncParsableCommand {
             name: "LocalRunner",
             platforms: [.macOS(.v14)],
             dependencies: [
-                .package(path: "..")
+                .package(path: ".."),
+                .package(url: "https://github.com/briannadoubt/Trebuchet.git", from: "1.0.0")
             ],
             targets: [
                 .executableTarget(
                     name: "LocalRunner",
                     dependencies: [
-                        .product(name: "Trebuchet", package: "\(projectName)"),
-                        .product(name: "TrebuchetCloud", package: "\(projectName)"),
-                        .product(name: "\(projectName)", package: "\(projectName)")
+                        .product(name: "Trebuchet", package: "Trebuchet"),
+                        .product(name: "TrebuchetCloud", package: "Trebuchet"),
+                        .product(name: "\(projectName)", package: "\(parentPackageName)")
                     ]
                 )
             ]
@@ -183,9 +189,47 @@ struct DevCommand: AsyncParsableCommand {
         """
     }
 
+    private func getParentPackageName(from directory: String) throws -> String? {
+        let packagePath = "\(directory)/Package.swift"
+        guard FileManager.default.fileExists(atPath: packagePath),
+              let contents = try? String(contentsOfFile: packagePath) else {
+            return nil
+        }
+
+        // Extract package name from Package.swift
+        if let range = contents.range(of: #"name:\s*"([^"]+)""#, options: .regularExpression) {
+            let match = String(contents[range])
+            if let nameRange = match.range(of: #""([^"]+)""#, options: .regularExpression) {
+                let nameMatch = String(match[nameRange])
+                return nameMatch.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            }
+        }
+
+        return nil
+    }
+
+    private func inferModuleName(from actors: [ActorMetadata], projectName: String) -> String {
+        // Try to infer module name from actor file paths
+        // Format is typically: Sources/ModuleName/File.swift
+        for actor in actors {
+            let components = actor.filePath.components(separatedBy: "/")
+            if let sourcesIndex = components.firstIndex(of: "Sources"),
+               sourcesIndex + 1 < components.count {
+                let moduleName = components[sourcesIndex + 1]
+                // Skip test and example targets
+                if !moduleName.contains("Test") && !moduleName.contains("Example") {
+                    return moduleName
+                }
+            }
+        }
+
+        // Fall back to project name if we can't infer
+        return projectName
+    }
+
     private func generateLocalRunner(
         actors: [ActorMetadata],
-        projectName: String,
+        moduleName: String,
         host: String,
         port: UInt16
     ) -> String {
@@ -209,7 +253,7 @@ struct DevCommand: AsyncParsableCommand {
         import Foundation
         import Trebuchet
         import TrebuchetCloud
-        import \(projectName)
+        import \(moduleName)
 
         @main
         struct LocalRunner {
