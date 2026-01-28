@@ -54,7 +54,12 @@ public actor DynamoDBStateStore: ActorStateStore {
         for actorID: String
     ) async throws {
         let stateData = try encoder.encode(state)
-        try await putItem(actorID: actorID, state: stateData, sequenceNumber: nil)
+
+        // Get current sequence number and increment, or start at 1
+        let currentSeq = try await getSequenceNumber(for: actorID) ?? 0
+        let newSeq = currentSeq + 1
+
+        try await putItem(actorID: actorID, state: stateData, sequenceNumber: newSeq)
     }
 
     /// Save state with an explicit sequence number for ordering
@@ -130,6 +135,72 @@ public actor DynamoDBStateStore: ActorStateStore {
         // Save and return
         try await save(newState, for: actorID)
         return newState
+    }
+
+    // MARK: - Optimistic Locking
+
+    /// Save state with version check to prevent concurrent write conflicts
+    ///
+    /// Uses DynamoDB's conditional expressions to ensure the version matches
+    /// before updating. If the version doesn't match, throws versionConflict.
+    ///
+    /// - Parameters:
+    ///   - state: The state to save
+    ///   - actorID: Actor identifier
+    ///   - expectedVersion: The version number that must match for the save to succeed
+    /// - Returns: The new version number after save
+    /// - Throws: ActorStateError.versionConflict if the version doesn't match
+    public func saveIfVersion<State: Codable & Sendable>(
+        _ state: State,
+        for actorID: String,
+        expectedVersion: UInt64
+    ) async throws -> UInt64 {
+        let stateData = try encoder.encode(state)
+        let newVersion = expectedVersion + 1
+
+        var item: [String: DynamoDBAttributeValue] = [
+            "actorId": .string(actorID),
+            "state": .binary(stateData),
+            "sequenceNumber": .number("\(newVersion)"),
+            "updatedAt": .string(ISO8601DateFormatter().string(from: Date()))
+        ]
+
+        // For new items (expectedVersion == 0), check attribute_not_exists
+        // For existing items, check sequenceNumber matches
+        let conditionExpression: String
+        let expressionAttributeValues: [String: DynamoDBAttributeValue]?
+
+        if expectedVersion == 0 {
+            conditionExpression = "attribute_not_exists(actorId)"
+            expressionAttributeValues = nil
+        } else {
+            conditionExpression = "sequenceNumber = :expected"
+            expressionAttributeValues = [":expected": .number("\(expectedVersion)")]
+        }
+
+        let request = DynamoDBRequest(
+            operation: "PutItem",
+            tableName: tableName,
+            item: item,
+            conditionExpression: conditionExpression,
+            expressionAttributeValues: expressionAttributeValues
+        )
+
+        do {
+            _ = try await execute(request)
+            return newVersion
+        } catch let error as CloudError {
+            // Check if it's a conditional check failure
+            if case .stateStoreFailed(let reason) = error,
+               reason.contains("ConditionalCheckFailedException") {
+                let actualVersion = try await getSequenceNumber(for: actorID) ?? 0
+                throw ActorStateError.versionConflict(
+                    expected: expectedVersion,
+                    actual: actualVersion
+                )
+            }
+            throw error
+        }
     }
 
     // MARK: - DynamoDB Operations
@@ -236,11 +307,15 @@ struct DynamoDBRequest: Codable {
     let tableName: String
     var key: [String: DynamoDBAttributeValue]?
     var item: [String: DynamoDBAttributeValue]?
+    var conditionExpression: String?
+    var expressionAttributeValues: [String: DynamoDBAttributeValue]?
 
     enum CodingKeys: String, CodingKey {
         case tableName = "TableName"
         case key = "Key"
         case item = "Item"
+        case conditionExpression = "ConditionExpression"
+        case expressionAttributeValues = "ExpressionAttributeValues"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -252,6 +327,12 @@ struct DynamoDBRequest: Codable {
         if let item = item {
             try container.encode(item, forKey: .item)
         }
+        if let conditionExpression = conditionExpression {
+            try container.encode(conditionExpression, forKey: .conditionExpression)
+        }
+        if let expressionAttributeValues = expressionAttributeValues {
+            try container.encode(expressionAttributeValues, forKey: .expressionAttributeValues)
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -260,13 +341,24 @@ struct DynamoDBRequest: Codable {
         self.tableName = try container.decode(String.self, forKey: .tableName)
         self.key = try container.decodeIfPresent([String: DynamoDBAttributeValue].self, forKey: .key)
         self.item = try container.decodeIfPresent([String: DynamoDBAttributeValue].self, forKey: .item)
+        self.conditionExpression = try container.decodeIfPresent(String.self, forKey: .conditionExpression)
+        self.expressionAttributeValues = try container.decodeIfPresent([String: DynamoDBAttributeValue].self, forKey: .expressionAttributeValues)
     }
 
-    init(operation: String, tableName: String, key: [String: DynamoDBAttributeValue]? = nil, item: [String: DynamoDBAttributeValue]? = nil) {
+    init(
+        operation: String,
+        tableName: String,
+        key: [String: DynamoDBAttributeValue]? = nil,
+        item: [String: DynamoDBAttributeValue]? = nil,
+        conditionExpression: String? = nil,
+        expressionAttributeValues: [String: DynamoDBAttributeValue]? = nil
+    ) {
         self.operation = operation
         self.tableName = tableName
         self.key = key
         self.item = item
+        self.conditionExpression = conditionExpression
+        self.expressionAttributeValues = expressionAttributeValues
     }
 }
 
