@@ -36,7 +36,7 @@ let package = Package(
             targets: ["TrebuchetPlugin"]
         ),
         .executable(
-            name: "TrebuchetCLI",
+            name: "trebuchet",
             targets: ["TrebuchetCLI"]
         ),
     ],
@@ -128,9 +128,6 @@ let package = Package(
                 .product(name: "Yams", package: "Yams"),
                 .product(name: "SwiftSyntax", package: "swift-syntax"),
                 .product(name: "SwiftParser", package: "swift-syntax"),
-            ],
-            swiftSettings: [
-                .unsafeFlags(["-parse-as-library"])
             ]
         ),
         .plugin(
