@@ -2,6 +2,7 @@ import ArgumentParser
 import Foundation
 
 /// Main Trebuchet CLI command structure shared between executable and plugin
+@main
 public struct TrebuchetCommand: AsyncParsableCommand {
     public static let configuration = CommandConfiguration(
         commandName: "trebuchet",
