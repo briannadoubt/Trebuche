@@ -24,8 +24,8 @@ struct ConfigurationTests {
     func defaultSettingsDefaults() {
         let defaults = DefaultSettings()
 
-        #expect(defaults.provider == "aws")
-        #expect(defaults.region == "us-east-1")
+        #expect(defaults.provider == "fly")
+        #expect(defaults.region == "iad")
         #expect(defaults.memory == 512)
         #expect(defaults.timeout == 30)
     }
@@ -101,8 +101,8 @@ struct ConfigLoaderTests {
         let yaml = ConfigLoader.generateDefault(projectName: "test-app")
 
         #expect(yaml.contains("name: test-app"))
-        #expect(yaml.contains("provider: aws"))
-        #expect(yaml.contains("region: us-east-1"))
+        #expect(yaml.contains("provider: fly"))
+        #expect(yaml.contains("region: iad"))
     }
 }
 
