@@ -86,7 +86,7 @@ struct ProtocolVersioningTests {
         let result1 = negotiator.negotiate(with: 1)
         #expect(result1 != nil)
         #expect(result1?.version == 1)
-        #expect(result1?.isClientOutdated == false)
+        #expect(result1?.isClientOutdated == true)  // Client is outdated (server supports v2)
 
         // Client v2 connects to server v1-2
         let result2 = negotiator.negotiate(with: 2)

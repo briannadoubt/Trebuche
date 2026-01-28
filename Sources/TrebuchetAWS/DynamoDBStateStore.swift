@@ -54,7 +54,12 @@ public actor DynamoDBStateStore: ActorStateStore {
         for actorID: String
     ) async throws {
         let stateData = try encoder.encode(state)
-        try await putItem(actorID: actorID, state: stateData, sequenceNumber: nil)
+
+        // Get current sequence number and increment, or start at 1
+        let currentSeq = try await getSequenceNumber(for: actorID) ?? 0
+        let newSeq = currentSeq + 1
+
+        try await putItem(actorID: actorID, state: stateData, sequenceNumber: newSeq)
     }
 
     /// Save state with an explicit sequence number for ordering

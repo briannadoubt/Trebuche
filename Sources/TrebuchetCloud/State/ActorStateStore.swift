@@ -47,6 +47,11 @@ public protocol ActorStateStore: Sendable {
         as type: State.Type,
         transform: @Sendable (State?) async throws -> State
     ) async throws -> State
+
+    /// Get the current sequence number (version) for an actor's state
+    /// - Parameter actorID: The actor's identifier
+    /// - Returns: The current version number, or nil if no state exists
+    func getSequenceNumber(for actorID: String) async throws -> UInt64?
 }
 
 // MARK: - State Versioning Extension
@@ -144,11 +149,13 @@ extension ActorStateStore {
         throw ActorStateError.maxRetriesExceeded
     }
 
-    /// Get the current sequence number (version) for an actor's state
-    /// - Parameter actorID: The actor's identifier
-    /// - Returns: The current version number, or nil if no state exists
-    func getSequenceNumber(for actorID: String) async throws -> UInt64? {
-        // Default implementation for stores without native versioning
+}
+
+// MARK: - Default Implementations
+
+extension ActorStateStore {
+    /// Default implementation of getSequenceNumber for stores without native versioning
+    public func getSequenceNumber(for actorID: String) async throws -> UInt64? {
         return nil
     }
 }
