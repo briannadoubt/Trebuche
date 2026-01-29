@@ -2,10 +2,12 @@ name: Update Documentation
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [closed]
+    branches: [main]
 
 jobs:
   update-docs:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
