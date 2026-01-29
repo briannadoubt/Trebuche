@@ -2,6 +2,7 @@ import Distributed
 import Foundation
 import Trebuchet
 import TrebuchetCloud
+import SotoCore
 
 // MARK: - Cloud Client
 
@@ -34,10 +35,11 @@ public actor TrebuchetCloudClient {
         credentials: AWSCredentials = .default
     ) -> TrebuchetCloudClient {
         let actorSystem = TrebuchetActorSystem()
+        // Convert String region to Soto Region enum
+        let awsRegion = Region(rawValue: region)
         let registry = CloudMapRegistry(
             namespace: namespace,
-            region: region,
-            credentials: credentials
+            region: awsRegion
         )
 
         return TrebuchetCloudClient(
