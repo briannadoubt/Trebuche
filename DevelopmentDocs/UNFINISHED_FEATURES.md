@@ -715,40 +715,35 @@ private func sendBatch(_ batch: [Metric]) async throws {
 
 ---
 
-## 10. Deprecated API Cleanup 🔵 ARCHITECTURAL
+## 10. Deprecated API Cleanup ✅ COMPLETED
 
-**Status:** Marked deprecated but still present
-**Impact:** Code clutter, maintenance burden
-**Effort:** Trivial (1 hour)
+**Status:** All deprecated APIs removed
+**Impact:** Cleaner codebase, breaking change for users
+**Completed:** January 2026
 
-### Affected Components
+### Removed APIs
 
-| Component | File | Issue |
-|-----------|------|-------|
-| JWT Authenticator | `TrebuchetSecurity/Authentication/JWTAuthenticator.swift:72,78` | Deprecated methods |
-| SwiftUI Modifiers | `Trebuchet/SwiftUI/TrebuchetViewModifiers.swift:56` | Deprecated modifier variant |
+| Component | Deprecated API | Replacement |
+|-----------|---------------|-------------|
+| JWT Authenticator | `SigningKey.symmetric(secret:)` | `SigningKey.hs256(secret:)` |
+| JWT Authenticator | `SigningKey.asymmetric(publicKey:)` | `SigningKey.es256(publicKey:)` |
+| SwiftUI Modifiers | `trebuchetClient(transport:reconnectionPolicy:autoConnect:)` | `trebuchet(transport:reconnectionPolicy:autoConnect:)` |
 
-### What to Remove
+### Implementation Details
 
-1. **JWTAuthenticator deprecated methods**
-   - Keep new renamed versions
-   - Remove old methods
-   - Update any internal callers
+**Changes Made:**
+1. ✅ Searched for callers - none found (APIs were unused)
+2. ✅ Removed deprecated methods from:
+   - `Sources/TrebuchetSecurity/Authentication/JWTAuthenticator.swift` (lines 69-82)
+   - `Sources/Trebuchet/SwiftUI/TrebuchetViewModifiers.swift` (lines 49-63)
+3. ✅ Created CHANGELOG.md with migration guide
+4. ✅ Documented breaking changes and migration path
 
-2. **SwiftUI deprecated modifiers**
-   - Keep new `.trebuchet(transport:reconnectionPolicy:autoConnect:)` signature
-   - Remove old signature
-   - Update documentation
+### Migration Guide
 
-### Implementation Path
+Users upgrading will need to update their code as documented in CHANGELOG.md.
 
-**Action Items:**
-1. Search for any callers of deprecated APIs
-2. Update callers to use new APIs
-3. Remove deprecated methods
-4. Update CHANGELOG for breaking change
-
-**Timing:** Do this in next major version (0.3.0 or 1.0.0)
+**This is a breaking change intended for the next major version.**
 
 ---
 

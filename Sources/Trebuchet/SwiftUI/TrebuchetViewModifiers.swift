@@ -46,22 +46,6 @@ extension View {
         ))
     }
 
-    /// Provides a Trebuchet connection to this view and its descendants.
-    ///
-    /// - Parameters:
-    ///   - transport: The transport configuration.
-    ///   - reconnectionPolicy: Policy for automatic reconnection. Defaults to `.default`.
-    ///   - autoConnect: Whether to connect automatically. Defaults to `true`.
-    /// - Returns: A view with the connection available in the environment.
-    @available(*, deprecated, renamed: "trebuchet(transport:reconnectionPolicy:autoConnect:)")
-    public func trebuchetClient(
-        transport: TransportConfiguration,
-        reconnectionPolicy: ReconnectionPolicy = .default,
-        autoConnect: Bool = true
-    ) -> some View {
-        trebuchet(transport: transport, reconnectionPolicy: reconnectionPolicy, autoConnect: autoConnect)
-    }
-
     /// Switches to a different named connection within the current manager.
     ///
     /// Use this modifier in multi-server scenarios to specify which connection
