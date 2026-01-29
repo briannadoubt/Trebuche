@@ -149,7 +149,7 @@ trebuchet deploy --provider aws --region us-east-1
 trebuchet deploy --provider fly --region iad
 ```
 
-### AWS Deployment
+### AWS Deployment (Untested)
 
 The CLI discovers your `@Trebuchet` actors, generates Terraform, and deploys to:
 - **AWS Lambda** for actor execution
