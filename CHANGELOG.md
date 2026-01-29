@@ -46,6 +46,22 @@ ContentView()
 
 ### Added
 
+- **Production-ready AWS Integration** (PR #28): Complete AWS Lambda deployment support with Soto SDK
+  - `AWSProvider` now implements full Lambda lifecycle management (deploy, update, status, list, undeploy)
+  - Automatic IAM role creation with `createRoles` parameter for simplified deployments
+  - Production `LambdaInvokeTransport` using Soto SDK with AWS credential chain support
+  - `StreamProcessorHandler` uses production DynamoDB and API Gateway clients
+  - New `AWSProviderError` enum for better error handling (missingRole, deploymentFailed, deploymentTimeout)
+  - Public `StreamProcessorError` enum for stream processor operations
+  - Support for reserved concurrency configuration
+  - Support for custom `AWSClient` configuration for advanced use cases
+  - Comprehensive environment variable validation in `StreamProcessorHandler`
+  - Function name sanitization for Lambda naming requirements
+  - Deployment status tracking with real-time Lambda state monitoring
+  - Tag-based function filtering for listing Trebuchet-managed deployments
+  - Optional VPC configuration for Lambda functions
+  - All 37 AWS integration tests passing
+
 - **TCP Transport**: Production-ready TCP transport for efficient server-to-server communication
   - Length-prefixed message framing (4-byte big-endian) via NIOExtras
   - Connection pooling with automatic stale connection cleanup
@@ -57,9 +73,16 @@ ContentView()
   - Security: Designed for trusted networks only (no TLS support)
   - Ideal for actor-to-actor communication in multi-machine deployments (e.g., Fly.io)
   - Usage: `.tcp(host: "0.0.0.0", port: 9001)`
+
 - PostgreSQL integration tests with Docker Compose infrastructure
 - Full LISTEN/NOTIFY stream adapter implementation with end-to-end verification
 - Comprehensive test documentation in `Tests/TrebuchetPostgreSQLTests/README.md`
+
+### Changed
+
+- **TrebuchetAWS**: `AWSProvider` changed from struct to final class to support proper AWS client lifecycle management
+- **TrebuchetAWS**: `LambdaInvokeTransport` now uses Soto SDK's `Lambda.invoke()` instead of manual HTTP requests and AWS Signature V4 signing
+- **TrebuchetAWS**: `StreamProcessorHandler.initialize()` now reads environment variables and uses production AWS clients instead of in-memory stubs
 
 ### Fixed
 

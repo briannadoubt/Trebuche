@@ -18,12 +18,40 @@ Before deploying, ensure you have:
 1. **AWS CLI** configured with appropriate credentials
 2. **Docker** installed (for cross-compilation)
 3. **Terraform** installed (for infrastructure management)
+4. **IAM permissions** for Lambda, DynamoDB, CloudMap, and optionally IAM role creation (see <doc:AWSConfiguration>)
 
 ```bash
 # Verify prerequisites
 aws sts get-caller-identity
 docker --version
 terraform --version
+```
+
+### IAM Role Options
+
+The AWS provider supports two approaches for IAM role management:
+
+**Option 1: Automatic Role Creation (Recommended for Development)**
+
+Enable automatic IAM role creation in your provider configuration:
+
+```swift
+let provider = AWSProvider(
+    region: "us-east-1",
+    createRoles: true
+)
+```
+
+This creates IAM roles automatically with basic Lambda execution permissions. Requires IAM permissions for role creation (see <doc:AWSConfiguration>).
+
+**Option 2: Pre-created Roles (Recommended for Production)**
+
+Create IAM roles separately and reference them in your configuration:
+
+```yaml
+actors:
+  GameRoom:
+    roleArn: arn:aws:iam::123456789012:role/GameRoomLambdaRole
 ```
 
 ## Quick Start
@@ -159,12 +187,19 @@ let players = try await lobby.getPlayers()
 ```yaml
 actors:
   GameRoom:
-    memory: 1024        # Memory in MB (128-10240)
-    timeout: 60         # Timeout in seconds (1-900)
-    stateful: true      # Enable state persistence
-    isolated: true      # Run in dedicated Lambda
-    environment:        # Environment variables
+    memory: 1024              # Memory in MB (128-10240)
+    timeout: 60               # Timeout in seconds (1-900)
+    stateful: true            # Enable state persistence
+    isolated: true            # Run in dedicated Lambda
+    reservedConcurrency: 10   # Reserved concurrent executions (optional)
+    roleArn: arn:aws:iam::123456789012:role/MyRole  # Custom IAM role (optional)
+    environment:              # Environment variables
       LOG_LEVEL: debug
+    vpcConfig:                # VPC configuration (optional)
+      securityGroupIds:
+        - sg-12345678
+      subnetIds:
+        - subnet-a1b2c3d4
 ```
 
 ### Environment Overrides
@@ -188,15 +223,40 @@ trebuchet deploy --environment production
 
 ### Check Status
 
+The AWS provider implements full deployment status tracking with real-time Lambda function state monitoring:
+
 ```bash
 trebuchet status --verbose
 ```
 
+The status command reports:
+- `active` - Function is deployed and ready to handle invocations
+- `deploying` - Function is being created or updated
+- `failed` - Deployment or update failed (includes error details)
+
+### List Deployments
+
+List all Trebuchet-managed Lambda functions in a region:
+
+```bash
+trebuchet list --region us-east-1
+```
+
+The provider identifies Trebuchet functions using the `ManagedBy=trebuchet` tag.
+
 ### Undeploy
+
+Remove deployed Lambda functions and associated resources:
 
 ```bash
 trebuchet undeploy
 ```
+
+The undeploy operation:
+1. Deletes Lambda functions
+2. Removes CloudMap service registrations
+3. Optionally removes DynamoDB state tables (if specified)
+4. Cleans up CloudWatch log groups
 
 ## Terraform Customization
 

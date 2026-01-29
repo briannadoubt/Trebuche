@@ -35,8 +35,16 @@ actors:
     timeout: 60            # Timeout in seconds (1-900)
     stateful: true         # Enable DynamoDB state persistence
     isolated: true         # Run in dedicated Lambda function
+    reservedConcurrency: 10  # Reserved concurrent executions (optional)
+    roleArn: arn:aws:iam::123456789012:role/MyCustomRole  # Custom IAM role (optional)
     environment:           # Environment variables
       KEY: value
+    vpcConfig:             # VPC configuration (optional)
+      securityGroupIds:
+        - sg-12345678
+      subnetIds:
+        - subnet-a1b2c3d4
+        - subnet-e5f6g7h8
 ```
 
 ### State Configuration
@@ -72,11 +80,14 @@ environments:
 
 ## AWS Credentials
 
-The CLI uses the standard AWS credential chain:
+The AWS provider uses the standard AWS credential chain powered by the Soto SDK:
 
-1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`)
 2. AWS credentials file (`~/.aws/credentials`)
 3. IAM instance profile (EC2, ECS, Lambda)
+4. AWS SSO credentials
+5. ECS container credentials
+6. EC2 instance metadata service
 
 ```bash
 # Using environment variables
@@ -93,9 +104,72 @@ export AWS_PROFILE=my-profile
 trebuchet deploy
 ```
 
+### Programmatic Credential Configuration
+
+When using the AWS provider directly in code, you can specify credentials explicitly or rely on the default credential chain:
+
+```swift
+import TrebuchetAWS
+
+// Use default credential chain (recommended)
+let provider = AWSProvider(region: "us-east-1")
+
+// Use static credentials
+let provider = AWSProvider(
+    region: "us-east-1",
+    credentials: AWSCredentials(
+        accessKeyId: "AKIAIOSFODNN7EXAMPLE",
+        secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        sessionToken: nil  // Optional session token
+    )
+)
+
+// Use custom AWSClient for advanced configuration
+let customClient = AWSClient(
+    credentialProvider: .default,
+    httpClientProvider: .createNew
+)
+let provider = AWSProvider(
+    region: "us-east-1",
+    awsClient: customClient
+)
+```
+
+## IAM Role Management
+
+### Automatic Role Creation
+
+The AWS provider supports automatic IAM role creation for simplified deployments. When enabled, the provider creates roles with the `AWSLambdaBasicExecutionRole` policy attached:
+
+```swift
+let provider = AWSProvider(
+    region: "us-east-1",
+    createRoles: true  // Automatically creates IAM roles for Lambda functions
+)
+```
+
+Created roles are named `trebuchet-{function-name}-role` and include:
+- Trust policy allowing Lambda service to assume the role
+- `AWSLambdaBasicExecutionRole` managed policy for CloudWatch Logs access
+- Tags: `ManagedBy=trebuchet`, `FunctionName={function-name}`
+
+**Note:** Role propagation can take up to 10 seconds. The provider waits for role availability before creating the Lambda function.
+
+### Custom IAM Roles
+
+For production deployments or when additional permissions are needed, provide a custom IAM role ARN:
+
+```yaml
+actors:
+  MyActor:
+    roleArn: arn:aws:iam::123456789012:role/MyCustomLambdaRole
+```
+
 ## IAM Permissions
 
-The deployment requires these IAM permissions:
+### Deployment Permissions
+
+The deployment process requires these IAM permissions:
 
 ```json
 {
@@ -109,6 +183,10 @@ The deployment requires these IAM permissions:
         "lambda:UpdateFunctionConfiguration",
         "lambda:DeleteFunction",
         "lambda:GetFunction",
+        "lambda:ListFunctions",
+        "lambda:ListTags",
+        "lambda:PutFunctionConcurrency",
+        "lambda:DeleteFunctionConcurrency",
         "lambda:CreateFunctionUrlConfig",
         "lambda:DeleteFunctionUrlConfig"
       ],
@@ -137,14 +215,21 @@ The deployment requires these IAM permissions:
       "Effect": "Allow",
       "Action": [
         "iam:CreateRole",
+        "iam:GetRole",
         "iam:DeleteRole",
         "iam:AttachRolePolicy",
         "iam:DetachRolePolicy",
         "iam:PutRolePolicy",
         "iam:DeleteRolePolicy",
-        "iam:PassRole"
+        "iam:PassRole",
+        "iam:TagRole"
       ],
-      "Resource": "arn:aws:iam::*:role/*"
+      "Resource": "arn:aws:iam::*:role/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "${var.allowed_regions}"
+        }
+      }
     },
     {
       "Effect": "Allow",
