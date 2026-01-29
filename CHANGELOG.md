@@ -46,6 +46,13 @@ ContentView()
 
 ### Added
 
+- **TCP Transport**: Production-ready TCP transport for efficient server-to-server communication
+  - Length-prefixed message framing (4-byte big-endian)
+  - Connection pooling for outgoing connections
+  - Full integration with TrebuchetServer and TrebuchetClient
+  - Comprehensive test suite with 8 integration tests
+  - Ideal for actor-to-actor communication in multi-machine deployments (e.g., Fly.io)
+  - Usage: `.tcp(host: "0.0.0.0", port: 9001)`
 - PostgreSQL integration tests with Docker Compose infrastructure
 - Full LISTEN/NOTIFY stream adapter implementation with end-to-end verification
 - Comprehensive test documentation in `Tests/TrebuchetPostgreSQLTests/README.md`
