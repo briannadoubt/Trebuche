@@ -41,6 +41,7 @@ import SotoCore
 /// ```
 public actor CloudMapRegistry: ServiceRegistry {
     private let client: ServiceDiscovery
+    private let awsClient: AWSClient
     private let namespace: String
     private let serviceName: String
 
@@ -74,12 +75,12 @@ public actor CloudMapRegistry: ServiceRegistry {
         self.namespace = namespace
         self.serviceName = serviceName
 
-        let client = awsClient ?? AWSClient(credentialProvider: .default)
+        self.awsClient = awsClient ?? AWSClient(credentialProvider: .default)
 
         if let endpoint = endpoint {
-            self.client = ServiceDiscovery(client: client, region: region, endpoint: endpoint)
+            self.client = ServiceDiscovery(client: self.awsClient, region: region, endpoint: endpoint)
         } else {
-            self.client = ServiceDiscovery(client: client, region: region)
+            self.client = ServiceDiscovery(client: self.awsClient, region: region)
         }
     }
 
@@ -377,5 +378,15 @@ public actor CloudMapRegistry: ServiceRegistry {
         for continuation in continuations {
             continuation.yield(event)
         }
+    }
+
+    // MARK: - Lifecycle
+
+    /// Shutdown the underlying AWS client
+    ///
+    /// This should be called when the registry is no longer needed to properly
+    /// clean up resources. After calling shutdown, the registry cannot be used.
+    public func shutdown() async throws {
+        try await awsClient.shutdown()
     }
 }

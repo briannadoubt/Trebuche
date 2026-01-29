@@ -66,6 +66,7 @@ public struct CloudWatchConfiguration: Sendable {
 /// ```
 public actor CloudWatchReporter: MetricsCollector {
     private let client: CloudWatch
+    private let awsClient: AWSClient
     private let configuration: CloudWatchConfiguration
     private var pendingMetrics: [CloudWatchMetric] = []
     private var flushTask: Task<Void, Never>?
@@ -80,8 +81,8 @@ public actor CloudWatchReporter: MetricsCollector {
     ) {
         self.configuration = configuration
 
-        let client = awsClient ?? AWSClient(credentialProvider: .default)
-        self.client = CloudWatch(client: client, region: configuration.region)
+        self.awsClient = awsClient ?? AWSClient(credentialProvider: .default)
+        self.client = CloudWatch(client: self.awsClient, region: configuration.region)
 
         // Start flush loop after initialization
         Task {
@@ -209,6 +210,16 @@ public actor CloudWatchReporter: MetricsCollector {
         case .megabytes: return .megabytes
         case .percent: return .percent
         }
+    }
+
+    /// Shutdown the reporter and underlying AWS client
+    ///
+    /// This cancels the flush task, flushes any pending metrics, and shuts down
+    /// the AWS client. Should be called when the reporter is no longer needed.
+    public func shutdown() async throws {
+        flushTask?.cancel()
+        try await flush()
+        try await awsClient.shutdown()
     }
 
     deinit {

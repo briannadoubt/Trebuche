@@ -9,6 +9,7 @@ import SotoCore
 /// Actor state storage using AWS DynamoDB with Soto SDK
 public actor DynamoDBStateStore: ActorStateStore {
     private let client: DynamoDB
+    private let awsClient: AWSClient
     private let tableName: String
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
@@ -30,15 +31,15 @@ public actor DynamoDBStateStore: ActorStateStore {
 
         // Use provided client or create new one with defaults
         // In Soto v7, httpClient defaults to HTTPClient.shared
-        let client = awsClient ?? AWSClient(
+        self.awsClient = awsClient ?? AWSClient(
             credentialProvider: .default
         )
 
         // Create DynamoDB client with optional custom endpoint
         if let endpoint = endpoint {
-            self.client = DynamoDB(client: client, region: region, endpoint: endpoint)
+            self.client = DynamoDB(client: self.awsClient, region: region, endpoint: endpoint)
         } else {
-            self.client = DynamoDB(client: client, region: region)
+            self.client = DynamoDB(client: self.awsClient, region: region)
         }
 
         self.encoder = JSONEncoder()
@@ -269,5 +270,15 @@ public actor DynamoDBStateStore: ActorStateStore {
         )
 
         _ = try await client.putItem(input)
+    }
+
+    // MARK: - Lifecycle
+
+    /// Shutdown the underlying AWS client
+    ///
+    /// This should be called when the state store is no longer needed to properly
+    /// clean up resources. After calling shutdown, the store cannot be used.
+    public func shutdown() async throws {
+        try await awsClient.shutdown()
     }
 }

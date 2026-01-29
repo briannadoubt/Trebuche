@@ -71,7 +71,7 @@ struct TrebuchetAWSTests {
 struct DynamoDBStateStoreTests {
 
     @Test("DynamoDBStateStore initialization")
-    func stateStoreInit() async {
+    func stateStoreInit() async throws {
         let store = DynamoDBStateStore(
             tableName: "test-table",
             region: .useast1
@@ -79,6 +79,9 @@ struct DynamoDBStateStoreTests {
 
         // Store should be created without errors
         #expect(store != nil)
+
+        // Clean up
+        try await store.shutdown()
     }
 }
 
@@ -86,13 +89,16 @@ struct DynamoDBStateStoreTests {
 struct CloudMapRegistryTests {
 
     @Test("CloudMapRegistry initialization")
-    func registryInit() async {
+    func registryInit() async throws {
         let registry = CloudMapRegistry(
             namespace: "test-namespace",
             region: .useast1
         )
 
         #expect(registry != nil)
+
+        // Clean up
+        try await registry.shutdown()
     }
 }
 
