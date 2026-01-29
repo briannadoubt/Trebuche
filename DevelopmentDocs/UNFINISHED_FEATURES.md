@@ -195,13 +195,13 @@ Features that improve maintainability and consistency.
 
 ---
 
-## 3. Security Middleware Integration 🟡 HIGH VALUE
+## 3. Security Middleware Integration ✅ COMPLETE
 
-**Status:** Implemented but not wired up
-**Impact:** Security features completely bypassed
-**Effort:** Small (2-3 days)
+**Status:** ✅ Implemented and wired up
+**Completed:** 2026-01-28 (as part of Task #2)
+**Impact:** Security features fully functional
 
-### Affected Components
+### Implementation Summary
 
 All middleware implementations exist and are complete:
 - `TrebuchetSecurity/Middleware/AuthenticationMiddleware.swift` ✅ Complete
@@ -210,57 +210,64 @@ All middleware implementations exist and are complete:
 - `TrebuchetSecurity/Middleware/ValidationMiddleware.swift` ✅ Complete
 - `TrebuchetCloud/Gateway/TracingMiddleware.swift` ✅ Complete
 
-**Problem:** CloudGateway creates MiddlewareChain but never invokes it.
+**Wired Up:** CloudGateway invokes MiddlewareChain in both entry points:
+- `handleMessage()` - Line 242: `middlewareChain.execute(envelope, actor, context)`
+- `process()` - Line 471: `middlewareChain.execute(envelope, actor, context)`
 
-### What's Missing
+### Integration Points
 
-**Location:** `CloudGateway.swift:151-158`
-
+**CloudGateway.swift:**
 ```swift
-// Currently:
-func process(_ envelope: InvocationEnvelope) async -> ResponseEnvelope {
-    // TODO: Integrate middleware and actual invocation
-    return ResponseEnvelope(...)
+// Line 242 (handleMessage)
+let response = try await middlewareChain.execute(
+    envelope,
+    actor: actor,
+    context: context
+) { envelope, context in
+    try await self.executeInvocation(envelope, on: actor)
 }
 
-// Should be:
-func process(_ envelope: InvocationEnvelope) async -> ResponseEnvelope {
-    return await middlewareChain.process(envelope) { envelope in
-        // Actual actor invocation logic here
-        return await self.invokeActor(envelope)
-    }
+// Line 471 (process)
+let response = try await middlewareChain.execute(
+    envelope,
+    actor: actor,
+    context: context
+) { envelope, context in
+    try await self.executeInvocation(envelope, on: actor)
 }
 ```
 
-### Implementation Path
+### Test Coverage
 
-**Day 1: Wire Up Middleware**
-- Modify `CloudGateway.process()` to invoke middleware chain
-- Pass invocation through all middleware layers
-- Ensure errors propagate correctly
+✅ **13 middleware integration tests** all passing:
+- AuthenticationMiddleware (valid/invalid credentials)
+- AuthorizationMiddleware (allow/deny)
+- RateLimitingMiddleware (within/over limit)
+- ValidationMiddleware (valid/invalid/oversized requests)
+- TracingMiddleware (span creation/export)
+- Empty chain execution
+- Chain ordering
+- Full stack integration
 
-**Day 2: Testing**
-- Test authentication rejection
-- Test authorization policies
-- Test rate limiting
-- Test request validation
+Test suite: `TrebuchetCloudTests/MiddlewareIntegrationTests.swift`
 
-**Day 3: Documentation**
-- Document middleware configuration
-- Add examples for custom middleware
-- Update deployment guides
+### Usage
 
-### Testing Strategy
+Middleware is configured through `CloudGateway.Configuration`:
 
-- Test each middleware type independently
-- Test middleware chain composition
-- Test error handling at each layer
-- Test performance impact
-
-### Dependencies
-
-- None (all middleware implementations exist)
-- Enables: Full security features for cloud deployments
+```swift
+let gateway = CloudGateway(configuration: .init(
+    host: "0.0.0.0",
+    port: 8080,
+    middlewares: [
+        AuthenticationMiddleware(provider: apiKeyAuth),
+        AuthorizationMiddleware(policy: rbacPolicy),
+        RateLimitingMiddleware(limiter: tokenBucket),
+        ValidationMiddleware(validator: requestValidator),
+        TracingMiddleware(exporter: spanExporter)
+    ]
+))
+```
 
 ---
 
