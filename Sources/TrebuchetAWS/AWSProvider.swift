@@ -10,7 +10,7 @@ import NIOCore
 // MARK: - AWS Provider
 
 /// Cloud provider implementation for AWS Lambda deployment
-public struct AWSProvider: CloudProvider, Sendable {
+public final class AWSProvider: CloudProvider, @unchecked Sendable {
     public typealias FunctionConfig = AWSFunctionConfig
     public typealias DeploymentResult = AWSDeployment
 
@@ -22,6 +22,7 @@ public struct AWSProvider: CloudProvider, Sendable {
     private let iamClient: IAM?
     private let awsClient: AWSClient
     private let createRoles: Bool
+    private let ownsClient: Bool
 
     /// Initialize AWS provider
     ///
@@ -42,8 +43,10 @@ public struct AWSProvider: CloudProvider, Sendable {
 
         // Create or use provided AWSClient
         let client: AWSClient
+        let ownsClient: Bool
         if let provided = awsClient {
             client = provided
+            ownsClient = false // Caller owns the client
         } else if let accessKey = credentials.accessKeyId,
                   let secretKey = credentials.secretAccessKey {
             // Use static credentials if provided
@@ -54,17 +57,27 @@ public struct AWSProvider: CloudProvider, Sendable {
                     sessionToken: credentials.sessionToken
                 )
             )
+            ownsClient = true
         } else {
             // Otherwise use default credential chain
             client = AWSClient(credentialProvider: .default)
+            ownsClient = true
         }
 
         self.awsClient = client
+        self.ownsClient = ownsClient
         self.lambdaClient = Lambda(
             client: client,
             region: Region(awsRegionName: region) ?? .useast1
         )
         self.iamClient = createRoles ? IAM(client: client) : nil
+    }
+
+    deinit {
+        // Shut down the AWS client if we created it
+        if ownsClient {
+            try? awsClient.syncShutdown()
+        }
     }
 
     public func deploy<A: DistributedActor>(

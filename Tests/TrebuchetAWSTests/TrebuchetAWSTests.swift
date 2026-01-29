@@ -78,7 +78,7 @@ struct DynamoDBStateStoreTests {
         )
 
         // Store should be created without errors
-        #expect(store != nil)
+        // Note: We verify initialization succeeded by not throwing
 
         // Clean up
         try await store.shutdown()
@@ -95,7 +95,7 @@ struct CloudMapRegistryTests {
             region: .useast1
         )
 
-        #expect(registry != nil)
+        // Note: We verify initialization succeeded by not throwing
 
         // Clean up
         try await registry.shutdown()
@@ -106,13 +106,16 @@ struct CloudMapRegistryTests {
 struct LambdaTransportTests {
 
     @Test("LambdaInvokeTransport initialization")
-    func transportInit() {
+    func transportInit() async {
         let transport = LambdaInvokeTransport(
             functionArn: "arn:aws:lambda:us-east-1:123456789012:function:test",
             region: "us-east-1"
         )
 
-        #expect(transport != nil)
+        // Note: We verify initialization succeeded by not throwing
+
+        // Clean up
+        await transport.shutdown()
     }
 
     @Test("HTTP response status codes")
