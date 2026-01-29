@@ -6,7 +6,7 @@
 
 ## WebSocket Transport
 
-WebSocket is the default and recommended transport:
+WebSocket is the recommended transport for most use cases:
 
 ```swift
 // Server - listen on all interfaces
@@ -31,6 +31,31 @@ let tls = try TLSConfiguration(
 
 .webSocket(host: "0.0.0.0", port: 8443, tls: tls)
 ```
+
+## TCP Transport
+
+TCP transport provides efficient server-to-server communication with minimal protocol overhead:
+
+```swift
+// Server - listen on all interfaces
+.tcp(port: 9001)
+
+// Server - specific interface
+.tcp(host: "192.168.1.100", port: 9001)
+
+// Client
+.tcp(host: "server.local", port: 9001)
+```
+
+TCP transport is ideal for:
+- Internal service-to-service communication
+- Trusted network environments (VPC, private networks)
+- Scenarios where WebSocket handshake overhead is unnecessary
+- Multi-machine deployments (e.g., Fly.io)
+
+**Security Note:** TCP transport does not support TLS. Use WebSocket with TLS for public networks, or deploy TCP within a trusted network boundary.
+
+See ``TCPTransport`` for detailed usage and security considerations.
 
 ## Topics
 

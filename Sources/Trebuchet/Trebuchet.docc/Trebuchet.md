@@ -49,6 +49,7 @@ try await room.join(player: me)
 ### Transport Layer
 
 - ``TrebuchetTransport``
+- ``TCPTransport``
 - ``Endpoint``
 - ``TransportMessage``
 - ``TransportConfiguration``

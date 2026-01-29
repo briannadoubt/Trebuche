@@ -72,6 +72,8 @@ Sources/Trebuchet/
 │   └── StreamRegistry.swift        # Client-side stream state management
 ├── Transport/
 │   ├── Transport.swift             # Transport protocol, Endpoint, TransportMessage
+│   ├── TCP/
+│   │   └── TCPTransport.swift      # TCP implementation with connection pooling
 │   └── WebSocket/
 │       └── WebSocketTransport.swift # WebSocket implementation using swift-nio
 ├── Server/
@@ -371,6 +373,7 @@ let players = try await lobby.getPlayers()  // Invokes another Lambda
 - **swift-nio**: Cross-platform networking
 - **swift-nio-ssl**: TLS support
 - **swift-nio-transport-services**: Network.framework integration
+- **swift-nio-extras**: Length-field framing for TCP transport
 - **websocket-kit**: WebSocket support
 - **swift-syntax**: Macro implementation and actor discovery
 - **swift-argument-parser**: CLI argument parsing

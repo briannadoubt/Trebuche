@@ -60,6 +60,31 @@ let newValue = try await counter.increment()
 print("Counter is now: \(newValue)")
 ```
 
+## Choosing a Transport
+
+Trebuchet supports two transport protocols:
+
+**WebSocket** (recommended for most use cases):
+- Browser client support
+- TLS encryption support
+- Public network communication
+- Maximum compatibility
+
+**TCP** (for server-to-server communication):
+- Lower overhead for internal services
+- Trusted network environments (VPC, private networks)
+- Multi-machine deployments (e.g., Fly.io)
+
+```swift
+// WebSocket transport
+.webSocket(host: "api.example.com", port: 8080)
+
+// TCP transport
+.tcp(host: "server.local", port: 9001)
+```
+
+See ``TransportConfiguration`` and ``TCPTransport`` for details.
+
 ## Using with SwiftUI
 
 Trebuchet provides SwiftUI integration for reactive actor connections:

@@ -114,6 +114,45 @@ trebuchet deploy --provider fly
 # 4. Your actors can now use saveState() and loadState()
 ```
 
+## TCP Transport for Multi-Machine Deployments
+
+When deploying multiple Fly.io instances that need to communicate with each other, you can use TCP transport for efficient server-to-server communication:
+
+```swift
+// In your actor server code
+let server = TrebuchetServer(transport: .tcp(host: "0.0.0.0", port: 9001))
+```
+
+**Benefits of TCP for Fly.io:**
+- Lower overhead than WebSocket for internal communication
+- No WebSocket handshake overhead
+- Efficient for actor-to-actor calls across instances
+- Works within Fly.io's private network (6PN)
+
+**Security:** TCP transport doesn't include TLS. This is acceptable within Fly.io's private network, which is isolated from the public internet. For external client connections, continue using WebSocket with TLS.
+
+**Example Configuration:**
+
+```yaml
+name: my-game-server
+version: "1"
+
+defaults:
+  provider: fly
+  region: ord
+  memory: 512
+  transport: tcp  # Use TCP for server-to-server communication
+  port: 9001      # TCP port for actor communication
+
+actors:
+  GameRoom:
+    memory: 512
+  Lobby:
+    memory: 256
+```
+
+See ``TCPTransport`` for detailed documentation.
+
 ## Regions
 
 Available regions:
