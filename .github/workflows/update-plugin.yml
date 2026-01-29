@@ -1,0 +1,126 @@
+name: Update Trebuchet Plugin
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  update-plugin:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+    steps:
+      - name: Checkout Trebuchet
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: trebuchet
+
+      - name: Checkout trebuchet-plugin
+        uses: actions/checkout@v4
+        with:
+          repository: briannadoubt/trebuchet-plugin
+          token: ${{ secrets.UPDATE_TREBUCHET_PLUGIN_PAT }}
+          fetch-depth: 0
+          path: trebuchet-plugin
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_tools: "Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git checkout -b:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(ls:*),Bash(find:*),View,GlobTool,GrepTool,Edit,Write"
+          prompt: |
+            A pull request was just merged to the Trebuchet framework repo (briannadoubt/Trebuchet):
+            PR #${{ github.event.pull_request.number }}: "${{ github.event.pull_request.title }}"
+
+            Your job is to review the Trebuchet code changes and update the Claude plugin at `briannadoubt/trebuchet-plugin` so its agent skills and definitions stay accurate and in sync with the framework.
+
+            Two repos have been checked out side by side:
+            - `./trebuchet/` — the Trebuchet framework (source of truth)
+            - `./trebuchet-plugin/` — the Claude plugin to update
+
+            ## Step 1: Understand the Trebuchet Changes
+
+            Review the merged PR to understand what changed in Trebuchet:
+            - Run `gh pr view ${{ github.event.pull_request.number }} --repo briannadoubt/Trebuchet --json title,body,files` to see PR details.
+            - Run `gh pr diff ${{ github.event.pull_request.number }} --repo briannadoubt/Trebuchet` to see the code diff.
+            - Focus on: new or changed public APIs, CLI commands, configuration options, deployment workflows, new modules, removed functionality, and behavioral changes.
+
+            ## Step 2: Understand the Plugin Structure
+
+            Explore `./trebuchet-plugin/` thoroughly to understand its structure:
+            - Read the README and any manifest/config files (package.json, plugin.json, etc.)
+            - Identify all skill definitions, agent instructions, tool schemas, and prompt templates.
+            - Understand how skills map to Trebuchet features (CLI commands, API usage, deployment, configuration, etc.)
+
+            ## Step 3: Identify What Needs Updating
+
+            Compare the Trebuchet changes against the plugin's current skill definitions. Look for:
+
+            1. **New CLI commands or flags** in Trebuchet that the plugin doesn't know about yet
+            2. **Changed CLI syntax** where the plugin references outdated command signatures
+            3. **New public APIs** (actor system types, transport options, SwiftUI wrappers, cloud types) that skills should reference
+            4. **Changed API behavior** where skill instructions now describe outdated behavior
+            5. **Removed APIs or commands** still referenced in skills
+            6. **New configuration options** (trebuchet.yaml keys, environment variables) not covered by skills
+            7. **New modules or deployment targets** that could warrant new skills
+            8. **Code examples in skills** that no longer compile or reflect current API usage
+
+            ## Step 4: Decide Whether to Act
+
+            If ALL of the following are true, output a summary saying the plugin is already up-to-date and stop:
+            - The Trebuchet changes are purely internal (no public API or CLI changes)
+            - No existing skill references outdated information
+            - No new user-facing capability warrants a new or updated skill
+
+            Otherwise, proceed to Step 5.
+
+            ## Step 5: Update the Plugin
+
+            Working inside the `./trebuchet-plugin/` directory:
+
+            1. **Create a branch**: `git checkout -b plugin/sync-trebuchet-pr-${{ github.event.pull_request.number }}`
+
+            2. **Update existing skills** — fix any outdated API references, CLI command syntax, code examples, or behavioral descriptions to match the current Trebuchet API.
+
+            3. **Add new skills** if the Trebuchet changes introduced significant new user-facing functionality (new CLI commands, new deployment targets, new framework features) that users would want help with.
+
+            4. **Remove or deprecate skills** if Trebuchet removed the underlying functionality.
+
+            5. **Update agent instructions** if the plugin has top-level agent/system prompts that describe Trebuchet's capabilities.
+
+            Follow these rules:
+            - All code examples must be valid, compilable Swift using Trebuchet's current API.
+            - CLI examples must use the current `trebuchet` command syntax.
+            - Skill descriptions should be concise and action-oriented.
+            - Do NOT invent capabilities that Trebuchet doesn't have.
+            - Do NOT add speculative skills for unfinished features.
+            - Match the existing style and conventions of the plugin.
+
+            ## Step 6: Open a Pull Request
+
+            From inside `./trebuchet-plugin/`:
+            1. Stage all changed files with `git add`
+            2. Commit with message: `sync: update skills for Trebuchet PR #${{ github.event.pull_request.number }}`
+            3. Push the branch: `git push -u origin plugin/sync-trebuchet-pr-${{ github.event.pull_request.number }}`
+            4. Open a PR with:
+               ```
+               gh pr create --repo briannadoubt/trebuchet-plugin \
+                 --title "sync: update skills for Trebuchet PR #${{ github.event.pull_request.number }}" \
+                 --body "Updates plugin skills to reflect changes from briannadoubt/Trebuchet#${{ github.event.pull_request.number }} (${{ github.event.pull_request.title }}).
+
+               <description of what was updated and why>"
+               ```
+
+            ## Important Notes
+
+            - Only modify files in `./trebuchet-plugin/`. Never modify `./trebuchet/`.
+            - Do NOT fabricate Trebuchet features. Only reference APIs and commands that actually exist in the codebase.
+            - Keep changes minimal and focused on what the merged PR actually changed.
+            - If unsure whether a Trebuchet feature is complete or still a stub, check the source code before documenting it as a skill.
