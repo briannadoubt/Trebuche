@@ -146,8 +146,9 @@ public actor TrebuchetCloudClient {
     }
 }
 
-// MARK: - Gateway Extension for Actor-to-Actor Calls
-// Moved to CloudGateway.swift in TrebuchetCloud module
+// MARK: - Gateway Extension
+// CloudGateway.process() method is implemented in CloudGateway.swift (TrebuchetCloud module)
+// For actor-to-actor calls, use process() for same-Lambda calls or TrebuchetCloudClient for cross-Lambda calls
 
 // MARK: - Actor Resolution Helpers
 
