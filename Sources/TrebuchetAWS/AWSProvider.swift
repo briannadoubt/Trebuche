@@ -242,10 +242,11 @@ public final class AWSProvider: CloudProvider, @unchecked Sendable {
             let request = Lambda.GetFunctionRequest(functionName: functionName)
             _ = try await lambdaClient.getFunction(request)
             return true
-        } catch {
+        } catch let error as LambdaErrorType where error == .resourceNotFoundException {
             // Function doesn't exist
             return false
         }
+        // All other errors (AccessDenied, TooManyRequests, etc.) propagate via throws
     }
 
     private func createFunction(
@@ -377,9 +378,10 @@ public final class AWSProvider: CloudProvider, @unchecked Sendable {
             let getRequest = IAM.GetRoleRequest(roleName: roleName)
             let response = try await iamClient.getRole(getRequest)
             return response.role.arn
-        } catch {
+        } catch let error as IAMErrorType where error == .noSuchEntityException {
             // Role doesn't exist, create it
         }
+        // All other errors (AccessDenied, etc.) propagate via throws
 
         // Create trust policy for Lambda
         let trustPolicy = """

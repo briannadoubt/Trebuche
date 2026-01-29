@@ -16,6 +16,7 @@ public final class LambdaInvokeTransport: TrebuchetTransport, @unchecked Sendabl
     private let region: String
     private let lambdaClient: Lambda
     private let awsClient: AWSClient
+    private let ownsClient: Bool
 
     private var incomingContinuation: AsyncStream<TransportMessage>.Continuation?
     private let incomingStream: AsyncStream<TransportMessage>
@@ -35,8 +36,10 @@ public final class LambdaInvokeTransport: TrebuchetTransport, @unchecked Sendabl
 
         // Create or use provided AWSClient
         let client: AWSClient
+        let ownsClient: Bool
         if let provided = awsClient {
             client = provided
+            ownsClient = false // Caller owns the client
         } else if let accessKey = credentials.accessKeyId,
                   let secretKey = credentials.secretAccessKey {
             // Use static credentials if provided
@@ -47,11 +50,14 @@ public final class LambdaInvokeTransport: TrebuchetTransport, @unchecked Sendabl
                     sessionToken: credentials.sessionToken
                 )
             )
+            ownsClient = true
         } else {
             // Otherwise use default credential chain
             client = AWSClient(credentialProvider: .default)
+            ownsClient = true
         }
         self.awsClient = client
+        self.ownsClient = ownsClient
         self.lambdaClient = Lambda(
             client: client,
             region: Region(awsRegionName: region) ?? .useast1
@@ -89,7 +95,9 @@ public final class LambdaInvokeTransport: TrebuchetTransport, @unchecked Sendabl
 
     public func shutdown() async {
         incomingContinuation?.finish()
-        try? await awsClient.shutdown()
+        if ownsClient {
+            try? await awsClient.shutdown()
+        }
     }
 
     // MARK: - Lambda Invocation

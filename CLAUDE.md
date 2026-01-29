@@ -72,8 +72,10 @@ Sources/Trebuchet/
 │   └── StreamRegistry.swift        # Client-side stream state management
 ├── Transport/
 │   ├── Transport.swift             # Transport protocol, Endpoint, TransportMessage
-│   └── WebSocket/
-│       └── WebSocketTransport.swift # WebSocket implementation using swift-nio
+│   ├── WebSocket/
+│   │   └── WebSocketTransport.swift # WebSocket implementation using swift-nio
+│   └── TCP/
+│       └── TCPTransport.swift      # TCP implementation with length-prefixed framing
 ├── Server/
 │   └── TrebuchetServer.swift       # Server API for hosting actors, stream buffering
 ├── Client/
@@ -370,6 +372,7 @@ let players = try await lobby.getPlayers()  // Invokes another Lambda
 
 - **swift-nio**: Cross-platform networking
 - **swift-nio-ssl**: TLS support
+- **swift-nio-extras**: Length-prefixed frame codecs (TCP transport)
 - **swift-nio-transport-services**: Network.framework integration
 - **websocket-kit**: WebSocket support
 - **swift-syntax**: Macro implementation and actor discovery
@@ -377,6 +380,7 @@ let players = try await lobby.getPlayers()  // Invokes another Lambda
 - **Yams**: YAML configuration parsing
 - **postgres-nio**: PostgreSQL client (TrebuchetPostgreSQL)
 - **swift-crypto**: Cryptographic operations (TrebuchetSecurity, TrebuchetAWS)
+- **soto (AWS SDK)**: AWS service clients (Lambda, DynamoDB, IAM, CloudWatch, ServiceDiscovery, ApiGatewayManagementApi)
 
 ### Tests
 
