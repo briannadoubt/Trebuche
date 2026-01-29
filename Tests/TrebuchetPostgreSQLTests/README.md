@@ -7,6 +7,7 @@ This directory contains integration tests for the TrebuchetPostgreSQL module, in
 ### Prerequisites
 
 - Docker and Docker Compose installed
+- No local PostgreSQL instance running on port 5432 (stop with `brew services stop postgresql@14` if needed)
 - PostgreSQL tests are automatically skipped if the database is not available
 
 ### Starting the Test Database
@@ -117,6 +118,27 @@ These integration tests are designed to run locally with Docker Compose. In CI e
 
 ## Troubleshooting
 
+### Port 5432 already in use
+
+**Important**: If you have a local PostgreSQL instance running (e.g., PostgreSQL@14 via Homebrew), you must stop it before starting the test container:
+
+```bash
+# Check what's using port 5432
+lsof -i :5432
+
+# Stop local PostgreSQL if running
+brew services stop postgresql@14
+# or for other versions:
+# brew services stop postgresql@16
+# brew services stop postgresql
+```
+
+Then start the test container:
+
+```bash
+docker-compose -f docker-compose.test.yml up -d
+```
+
 ### Container won't start
 
 Check if port 5432 is already in use:
@@ -125,7 +147,7 @@ Check if port 5432 is already in use:
 lsof -i :5432
 ```
 
-If another PostgreSQL instance is running, either stop it or modify the port in `docker-compose.test.yml`.
+If another service is using the port, either stop it or modify the port mapping in `docker-compose.test.yml`.
 
 ### Tests fail to connect
 
