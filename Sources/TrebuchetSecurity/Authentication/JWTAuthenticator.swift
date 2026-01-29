@@ -65,20 +65,6 @@ public struct JWTAuthenticator: AuthenticationProvider {
         /// No signature validation (for testing only)
         /// - Warning: Never use this in production!
         case none
-
-        // MARK: - Deprecated compatibility aliases
-
-        /// Deprecated: Use `.hs256(secret:)` instead
-        @available(*, deprecated, renamed: "hs256(secret:)")
-        public static func symmetric(secret: String) -> SigningKey {
-            .hs256(secret: secret)
-        }
-
-        /// Deprecated: Use `.es256(publicKey:)` instead
-        @available(*, deprecated, renamed: "es256(publicKey:)")
-        public static func asymmetric(publicKey: P256.Signing.PublicKey) -> SigningKey {
-            .es256(publicKey: publicKey)
-        }
     }
 
     /// JWT configuration
