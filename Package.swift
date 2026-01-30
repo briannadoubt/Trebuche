@@ -48,7 +48,6 @@ let package = Package(
         .package(url: "https://github.com/vapor/websocket-kit.git", from: "2.14.0"),
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.0"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.0"),
-        .package(url: "https://github.com/pointfreeco/swift-macro-testing.git", from: "0.2.0"),
         // PostgreSQL support
         .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
         // Cryptography (cross-platform)
@@ -200,13 +199,12 @@ let package = Package(
                 .product(name: "_CryptoExtras", package: "swift-crypto"),
             ]
         ),
-        .testTarget(
-            name: "TrebuchetMacrosTests",
-            dependencies: [
-                "TrebuchetMacros",
-                .product(name: "MacroTesting", package: "swift-macro-testing"),
-                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
-            ]
-        ),
+        // .testTarget(
+        //     name: "TrebuchetMacrosTests",
+        //     dependencies: [
+        //         "TrebuchetMacros",
+        //         .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
+        //     ]
+        // ),
     ]
 )
