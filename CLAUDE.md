@@ -439,6 +439,8 @@ let players = try await lobby.getPlayers()  // Invokes another Lambda
 - **postgres-nio**: PostgreSQL client (TrebuchetPostgreSQL)
 - **swift-crypto**: Cryptographic operations (TrebuchetSecurity, TrebuchetAWS)
 - **soto (AWS SDK)**: AWS service clients (Lambda, DynamoDB, IAM, CloudWatch, ServiceDiscovery, ApiGatewayManagementApi)
+- **swift-macro-testing**: Macro testing utilities (TrebuchetMacrosTests)
+- **swift-docc-plugin**: Documentation generation
 
 ### Tests
 
@@ -446,6 +448,7 @@ Tests use Swift Testing framework (`import Testing`). Run with `swift test`.
 
 Test suites:
 - `TrebuchetTests`: Core actor system, serialization, client-server
+- `TrebuchetMacrosTests`: Macro expansion and code generation tests
 - `TrebuchetCloudTests`: Cloud gateway, providers, state stores, registries
 - `TrebuchetAWSTests`: AWS-specific implementations
 - `TrebuchetCLITests`: CLI configuration, discovery, build system
