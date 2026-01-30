@@ -80,8 +80,8 @@ enum LocalStackTestHelpers {
             awsClient: client
         )
 
-        // Wait for namespace to be available
-        try await waitForNamespace(namespace: namespace, client: client)
+        // Note: Skipping waitForNamespace - LocalStack Community doesn't support ServiceDiscovery
+        // try await waitForNamespace(namespace: namespace, client: client)
 
         return registry
     }
