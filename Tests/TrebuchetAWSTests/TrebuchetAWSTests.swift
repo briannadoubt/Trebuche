@@ -89,6 +89,28 @@ struct TrebuchetAWSTests {
         }
     }
 
+    @Test("AWSBase64Data decoded method works correctly")
+    func awsBase64DataDecoding() {
+        // Test data
+        let testData = Data("Hello, Trebuchet!".utf8)
+
+        // Create AWSBase64Data from raw data
+        let awsData = AWSBase64Data.data(testData)
+
+        // Decode back to bytes
+        guard let decodedBytes = awsData.decoded() else {
+            Issue.record("Failed to decode AWSBase64Data")
+            return
+        }
+
+        // Convert back to Data
+        let decodedData = Data(decodedBytes)
+
+        // Verify round-trip works
+        #expect(decodedData == testData)
+        #expect(String(data: decodedData, encoding: .utf8) == "Hello, Trebuchet!")
+    }
+
     @Test("AWSDeployment properties")
     func deploymentProperties() {
         let deployment = AWSDeployment(
