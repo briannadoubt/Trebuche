@@ -30,11 +30,8 @@ awslocal dynamodb create-table \
 
 echo "✓ Created trebuchet-test-connections table with ActorIndex GSI"
 
-# Create Cloud Map namespace
-awslocal servicediscovery create-private-dns-namespace \
-  --name trebuchet-test \
-  --vpc vpc-12345
-
-echo "✓ Created trebuchet-test Cloud Map namespace"
+# Note: Cloud Map (ServiceDiscovery) requires LocalStack Pro
+# Skipping namespace creation as it's not available in Community Edition
+echo "⚠ Skipping Cloud Map namespace (requires LocalStack Pro)"
 
 echo "LocalStack table setup complete!"
