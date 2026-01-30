@@ -89,7 +89,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: test
           AWS_DEFAULT_REGION: us-east-1
         run: |
-          swift test --filter TrebuchetAWSTests
+          swift test --filter TrebuchetAWSTests --no-parallel
 
       - name: Upload test results
         if: always()
