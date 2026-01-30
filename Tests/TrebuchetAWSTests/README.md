@@ -4,20 +4,26 @@ This directory contains comprehensive integration tests for TrebuchetAWS using L
 
 ## Overview
 
-The test suite validates AWS functionality with real API calls against LocalStack-simulated services:
+The test suite validates AWS functionality with real API calls against LocalStack-simulated services.
+
+### Currently Tested (LocalStack Community Edition)
 
 - **DynamoDB** - Actor state persistence with optimistic locking
-- **DynamoDB Streams** - Real-time state change notifications
-- **Cloud Map** - Service discovery and registration
-- **IAM** - Role and policy management
-- **Lambda** - Function deployment (deployment API only)
-- **API Gateway WebSocket** - Connection management simulation
+- **DynamoDB Streams** - Real-time state change notifications (unit tests)
+- **IAM** - Role and policy management (setup only)
+- **Lambda** - Function deployment API (unit tests)
+- **API Gateway WebSocket** - Connection management (unit tests)
+
+### Disabled Tests (Require LocalStack Pro)
+
+- **Cloud Map (ServiceDiscovery)** - Service registry tests disabled (requires Pro)
+- **AWS Integration Workflows** - Cross-service workflows disabled (require Cloud Map)
 
 ## Test Structure
 
 ### Test Suites
 
-1. **DynamoDBStateStoreIntegrationTests** (9 tests)
+1. **DynamoDBStateStoreIntegrationTests** (9 tests) ✅
    - Save and load actor state
    - Sequence number auto-increment
    - Delete operations
@@ -26,16 +32,13 @@ The test suite validates AWS functionality with real API calls against LocalStac
    - Concurrent saves
    - Update with transform functions
 
-2. **CloudMapRegistryIntegrationTests** (5 tests)
-   - Register and resolve actors
-   - Deregister operations
-   - List actors with prefix filtering
-   - Heartbeat updates
+2. **CloudMapRegistryIntegrationTests** (5 tests) ⚠️ Disabled
+   - Requires LocalStack Pro (ServiceDiscovery not available in Community)
+   - Tests available in `CloudMapRegistryIntegrationTests.swift.disabled`
 
-3. **AWSIntegrationWorkflowTests** (3 workflows)
-   - Full actor discovery workflow (Cloud Map + DynamoDB)
-   - Optimistic locking conflict resolution
-   - Multi-region actor coordination
+3. **AWSIntegrationWorkflowTests** (3 workflows) ⚠️ Disabled
+   - Requires LocalStack Pro (depends on Cloud Map)
+   - Tests available in `AWSIntegrationWorkflowTests.swift.disabled`
 
 ### Test Helpers
 
@@ -74,16 +77,15 @@ docker-compose -f docker-compose.localstack.yml up -d
 # Verify LocalStack is healthy
 curl http://localhost:4566/_localstack/health
 
-# Expected output:
+# Expected output (LocalStack Community Edition):
 # {
 #   "services": {
 #     "dynamodb": "running",
-#     "servicediscovery": "running",
-#     "lambda": "running",
-#     "iam": "running",
-#     "apigatewayv2": "running"
+#     "lambda": "available",
+#     "iam": "running"
 #   }
 # }
+# Note: servicediscovery requires LocalStack Pro
 ```
 
 ### 2. Initialize Resources
