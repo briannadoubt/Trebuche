@@ -1,3 +1,5 @@
+// Macro tests require swift-syntax which has linker conflicts on Linux
+#if !os(Linux)
 import Testing
 import TrebuchetMacros
 
@@ -26,3 +28,4 @@ struct MacroSmokeTests {
         #expect(Bool(true))
     }
 }
+#endif
