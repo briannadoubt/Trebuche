@@ -167,14 +167,6 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "TrebuchetMacrosTests",
-            dependencies: [
-                "TrebuchetMacros",
-                .product(name: "MacroTesting", package: "swift-macro-testing"),
-                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
-            ]
-        ),
-        .testTarget(
             name: "TrebuchetCloudTests",
             dependencies: ["TrebuchetCloud"]
         ),
@@ -206,6 +198,14 @@ let package = Package(
                 "TrebuchetSecurity",
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "_CryptoExtras", package: "swift-crypto"),
+            ]
+        ),
+        .testTarget(
+            name: "TrebuchetMacrosTests",
+            dependencies: [
+                "TrebuchetMacros",
+                .product(name: "MacroTesting", package: "swift-macro-testing"),
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
             ]
         ),
     ]
