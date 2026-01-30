@@ -32,11 +32,7 @@ The test suite validates AWS functionality with real API calls against LocalStac
    - List actors with prefix filtering
    - Heartbeat updates
 
-3. **DynamoDBStreamAdapterIntegrationTests** (3 tests)
-   - Process INSERT/MODIFY stream events
-   - Handle malformed records gracefully
-
-4. **AWSIntegrationWorkflowTests** (3 workflows)
+3. **AWSIntegrationWorkflowTests** (3 workflows)
    - Full actor discovery workflow (Cloud Map + DynamoDB)
    - Optimistic locking conflict resolution
    - Multi-region actor coordination
@@ -120,7 +116,6 @@ swift test --filter TrebuchetAWSTests
 # Run specific test suite
 swift test --filter DynamoDBStateStoreIntegrationTests
 swift test --filter CloudMapRegistryIntegrationTests
-swift test --filter DynamoDBStreamAdapterIntegrationTests
 swift test --filter AWSIntegrationWorkflowTests
 
 # Run with verbose output

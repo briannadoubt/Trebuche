@@ -9,9 +9,6 @@ import SotoLambda
 import FoundationNetworking
 #endif
 
-/// Error thrown to skip tests when LocalStack is unavailable
-struct TestSkipError: Error {}
-
 /// Helper utilities for LocalStack-based integration tests
 enum LocalStackTestHelpers {
     /// LocalStack endpoint URL

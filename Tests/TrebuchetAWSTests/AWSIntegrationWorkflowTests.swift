@@ -21,7 +21,12 @@ struct AWSIntegrationWorkflowTests {
 
     @Test("Actor discovery workflow")
     func testActorDiscoveryWorkflow() async throws {
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+        try #require(await LocalStackTestHelpers.isServiceDiscoveryAvailable())
+
         let client = LocalStackTestHelpers.createAWSClient()
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+
         
 
         let registry = try await LocalStackTestHelpers.createRegistry(client: client)
@@ -69,7 +74,12 @@ struct AWSIntegrationWorkflowTests {
 
     @Test("Optimistic locking prevents conflicts")
     func testOptimisticLockingPreventsConflicts() async throws {
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+        try #require(await LocalStackTestHelpers.isServiceDiscoveryAvailable())
+
         let client = LocalStackTestHelpers.createAWSClient()
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+
         
 
         let stateStore = LocalStackTestHelpers.createStateStore(client: client)
@@ -118,7 +128,12 @@ struct AWSIntegrationWorkflowTests {
 
     @Test("Multi-region actor coordination")
     func testMultiRegionActorCoordination() async throws {
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+        try #require(await LocalStackTestHelpers.isServiceDiscoveryAvailable())
+
         let client = LocalStackTestHelpers.createAWSClient()
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+
         
 
         let registry = try await LocalStackTestHelpers.createRegistry(client: client)

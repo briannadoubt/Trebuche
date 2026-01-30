@@ -57,7 +57,6 @@ swift test --filter TrebuchetAWSTests
 # Specific integration suite
 swift test --filter DynamoDBStateStoreIntegrationTests
 swift test --filter CloudMapRegistryIntegrationTests
-swift test --filter DynamoDBStreamAdapterIntegrationTests
 swift test --filter AWSIntegrationWorkflowTests
 ```
 
@@ -68,7 +67,7 @@ docker-compose -f docker-compose.localstack.yml down -v
 
 ### Test Architecture
 Integration tests use Swift Testing framework with:
-- Graceful skipping when LocalStack unavailable (`.enabled(if:)` trait)
+- Graceful skipping when LocalStack unavailable (availability checks in test init)
 - Automatic test isolation via unique actor IDs
 - Cleanup in defer blocks to prevent resource leaks
 - LocalStack service simulation for 6 AWS services:
@@ -80,7 +79,6 @@ Integration tests use Swift Testing framework with:
   - API Gateway WebSocket - connection management
 
 For detailed troubleshooting and LocalStack limitations, see [Tests/TrebuchetAWSTests/README.md](Tests/TrebuchetAWSTests/README.md).
-```
 
 ## CLI Commands
 

@@ -21,7 +21,12 @@ struct CloudMapRegistryIntegrationTests {
 
     @Test("Register and resolve actor endpoint")
     func testRegisterAndResolve() async throws {
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+        try #require(await LocalStackTestHelpers.isServiceDiscoveryAvailable())
+
         let client = LocalStackTestHelpers.createAWSClient()
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+
         
 
         let registry = try await LocalStackTestHelpers.createRegistry(client: client)
@@ -54,7 +59,12 @@ struct CloudMapRegistryIntegrationTests {
 
     @Test("Resolve returns nil for non-existent actor")
     func testResolveNonExistent() async throws {
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+        try #require(await LocalStackTestHelpers.isServiceDiscoveryAvailable())
+
         let client = LocalStackTestHelpers.createAWSClient()
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+
         
 
         let registry = try await LocalStackTestHelpers.createRegistry(client: client)
@@ -68,7 +78,12 @@ struct CloudMapRegistryIntegrationTests {
 
     @Test("Deregister removes actor")
     func testDeregister() async throws {
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+        try #require(await LocalStackTestHelpers.isServiceDiscoveryAvailable())
+
         let client = LocalStackTestHelpers.createAWSClient()
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+
         
 
         let registry = try await LocalStackTestHelpers.createRegistry(client: client)
@@ -104,7 +119,12 @@ struct CloudMapRegistryIntegrationTests {
 
     @Test("List actors with prefix filter")
     func testListActors() async throws {
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+        try #require(await LocalStackTestHelpers.isServiceDiscoveryAvailable())
+
         let client = LocalStackTestHelpers.createAWSClient()
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+
         
 
         let registry = try await LocalStackTestHelpers.createRegistry(client: client)
@@ -148,7 +168,12 @@ struct CloudMapRegistryIntegrationTests {
 
     @Test("Heartbeat updates registration")
     func testHeartbeat() async throws {
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+        try #require(await LocalStackTestHelpers.isServiceDiscoveryAvailable())
+
         let client = LocalStackTestHelpers.createAWSClient()
+        try #require(await LocalStackTestHelpers.isLocalStackAvailable())
+
         
 
         let registry = try await LocalStackTestHelpers.createRegistry(client: client)
