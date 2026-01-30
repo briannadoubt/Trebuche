@@ -6,19 +6,6 @@ import Foundation
 @Suite("AWS Integration Workflow Tests")
 struct AWSIntegrationWorkflowTests {
 
-    init() async throws {
-        // Skip all tests if LocalStack is not available
-        guard await LocalStackTestHelpers.isLocalStackAvailable() else {
-            throw TestSkipError()
-        }
-
-        // Skip all tests if ServiceDiscovery (Cloud Map) is not available
-        // Note: These workflow tests depend on Cloud Map registry
-        guard await LocalStackTestHelpers.isServiceDiscoveryAvailable() else {
-            throw TestSkipError()
-        }
-    }
-
     @Test("Actor discovery workflow")
     func testActorDiscoveryWorkflow() async throws {
         try #require(await LocalStackTestHelpers.isLocalStackAvailable())

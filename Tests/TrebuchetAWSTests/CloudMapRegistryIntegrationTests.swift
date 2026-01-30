@@ -6,19 +6,6 @@ import Foundation
 @Suite("Cloud Map Registry Integration Tests")
 struct CloudMapRegistryIntegrationTests {
 
-    init() async throws {
-        // Skip all tests if LocalStack is not available
-        guard await LocalStackTestHelpers.isLocalStackAvailable() else {
-            throw TestSkipError()
-        }
-
-        // Skip all tests if ServiceDiscovery (Cloud Map) is not available
-        // Note: Requires LocalStack Pro, not available in Community Edition
-        guard await LocalStackTestHelpers.isServiceDiscoveryAvailable() else {
-            throw TestSkipError()
-        }
-    }
-
     @Test("Register and resolve actor endpoint")
     func testRegisterAndResolve() async throws {
         try #require(await LocalStackTestHelpers.isLocalStackAvailable())
