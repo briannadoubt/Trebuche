@@ -36,6 +36,10 @@ public final class TrebuchetActorSystem: DistributedActorSystem, @unchecked Send
     /// The callback should create and expose the actor
     public var onActorRequest: (@Sendable (TrebuchetActorID) async throws -> Void)?
 
+    /// Optional callback for translating exposed names to real actor IDs
+    /// Used when onActorRequest creates an actor with a name that needs to be resolved
+    public var nameToIDTranslator: (@Sendable (String) async -> TrebuchetActorID?)?
+
     /// The transport layer for network communication
     private var transport: (any TrebuchetTransport)?
 
@@ -181,7 +185,26 @@ public final class TrebuchetActorSystem: DistributedActorSystem, @unchecked Send
         if actor == nil, let handler = self.onActorRequest {
             do {
                 try await handler(envelope.actorID)
-                actor = await localActors.getAny(id: envelope.actorID)
+
+                // Translate the name to the real actor ID if we have a translator
+                var lookupID = envelope.actorID
+                if let translator = self.nameToIDTranslator,
+                   let realID = await translator(envelope.actorID.id) {
+                    lookupID = realID
+                }
+
+                // Retry lookup with small delays to handle race condition in actorReady()
+                // The fire-and-forget Task in actorReady() may not have completed yet
+                for attempt in 0..<5 {
+                    actor = await localActors.getAny(id: lookupID)
+                    if actor != nil {
+                        break
+                    }
+                    // Exponential backoff: 1ms, 2ms, 4ms, 8ms, 16ms (total max 31ms)
+                    if attempt < 4 {
+                        try? await Task.sleep(for: .milliseconds(1 << attempt))
+                    }
+                }
             } catch {
                 return .failure(callID: envelope.callID, error: "Failed to create actor: \(error)")
             }

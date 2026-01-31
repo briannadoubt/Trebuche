@@ -78,6 +78,12 @@ public final class TrebuchetServer: Sendable {
         actorSystem.streamingHandler = { envelope, actor in
             try await handlers.handle(envelope: envelope, actor: actor)
         }
+
+        // Set up name-to-ID translator for dynamic actor creation
+        let exposed = exposedActors
+        actorSystem.nameToIDTranslator = { name in
+            await exposed.getID(for: name)
+        }
     }
 
     /// Configure dynamic actor creation callback
