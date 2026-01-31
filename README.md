@@ -184,7 +184,7 @@ distributed actor GameRoom {
 // And nothing else!
 ```
 
-See **[XCODE_PROJECT_SUPPORT.md](XCODE_PROJECT_SUPPORT.md)** for detailed documentation.
+See **[Xcode Project Support](Sources/Trebuchet/Trebuchet.docc/XCODE_PROJECT_SUPPORT.md)** for detailed documentation.
 
 ## Cloud Deployment
 

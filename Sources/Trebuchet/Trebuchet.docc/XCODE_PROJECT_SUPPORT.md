@@ -147,7 +147,7 @@ The CLI will:
 3. **Recursively analyze** those files for their dependencies
 4. **Copy everything** needed to build your actors
 
-See [DEPENDENCY_ANALYSIS.md](DEPENDENCY_ANALYSIS.md) for complete details.
+See [Dependency Analysis](DEPENDENCY_ANALYSIS.md) for complete details.
 
 ### What This Means
 

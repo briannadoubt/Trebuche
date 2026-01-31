@@ -42,8 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - File-level caching for performance (50-100ms typical)
 
 #### Comprehensive Documentation
+
+**User Documentation (DocC):**
 - **XCODE_PROJECT_SUPPORT.md**: User guide and feature overview (149 lines)
 - **DEPENDENCY_ANALYSIS.md**: Deep dive into dependency discovery (400+ lines)
+
+**Developer Documentation (DevelopmentDocs):**
 - **CASCADE_PREVENTION.md**: Critical cascade prevention explanation (450+ lines)
 - **COMPLEXITY_COMPARISON.md**: File-level vs symbol-level analysis (600+ lines)
 - **SYMBOL_LEVEL_EXTRACTION.md**: Future enhancement design doc (400+ lines)

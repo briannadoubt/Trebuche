@@ -11,15 +11,15 @@
 
 Complete documentation for Xcode project support with automatic dependency analysis.
 
-### User Guides
-- **[XCODE_PROJECT_SUPPORT.md](XCODE_PROJECT_SUPPORT.md)** - Main user guide
+### User Guides (DocC)
+- **[XCODE_PROJECT_SUPPORT.md](../Sources/Trebuchet/Trebuchet.docc/XCODE_PROJECT_SUPPORT.md)** - Main user guide
   - Overview of Xcode project support
   - How project detection works
   - Command support status
   - Example usage
   - Limitations and workarounds
 
-- **[DEPENDENCY_ANALYSIS.md](DEPENDENCY_ANALYSIS.md)** - Dependency analysis deep dive
+- **[DEPENDENCY_ANALYSIS.md](../Sources/Trebuchet/Trebuchet.docc/DEPENDENCY_ANALYSIS.md)** - Dependency analysis deep dive
   - How automatic dependency discovery works
   - Supported type patterns
   - Smart filtering of standard types

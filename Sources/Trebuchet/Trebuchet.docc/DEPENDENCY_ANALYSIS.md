@@ -29,7 +29,7 @@ This means:
 - ✅ `AnalyticsEngine` is **NOT** analyzed or copied
 - ✅ No cascade to analytics dependencies
 
-See [CASCADE_PREVENTION.md](CASCADE_PREVENTION.md) for detailed explanation.
+See [CASCADE_PREVENTION.md](../../../DevelopmentDocs/CASCADE_PREVENTION.md) for detailed technical explanation.
 
 ### Why Hybrid Approach?
 
@@ -38,7 +38,7 @@ See [CASCADE_PREVENTION.md](CASCADE_PREVENTION.md) for detailed explanation.
 ✅ **Simpler and reliable** - No risk of breaking internal dependencies
 ✅ **Respects organization** - Developers organize files intentionally
 
-See [SYMBOL_LEVEL_EXTRACTION.md](SYMBOL_LEVEL_EXTRACTION.md) for a detailed analysis of symbol-level extraction.
+See [SYMBOL_LEVEL_EXTRACTION.md](../../../DevelopmentDocs/SYMBOL_LEVEL_EXTRACTION.md) for a detailed analysis of symbol-level extraction.
 
 ### Best Practice
 
