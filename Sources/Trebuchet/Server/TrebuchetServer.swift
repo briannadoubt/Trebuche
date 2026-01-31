@@ -80,6 +80,14 @@ public final class TrebuchetServer: Sendable {
         }
     }
 
+    /// Configure dynamic actor creation callback
+    /// Called when a client requests an actor that doesn't exist
+    /// - Parameter handler: Callback that receives the actorID and should create and expose the actor
+    public var onActorRequest: (@Sendable (TrebuchetActorID) async throws -> Void)? {
+        get { actorSystem.onActorRequest }
+        set { actorSystem.onActorRequest = newValue }
+    }
+
     /// Expose an actor with a given name so clients can resolve it
     /// - Parameters:
     ///   - actor: The distributed actor to expose
